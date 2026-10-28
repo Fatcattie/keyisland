@@ -1,0 +1,6 @@
+# Rust 构建产物
+/target/
+/gen/schemas/
+
+# 本地生成的图标缓存（图标本身要提交，见 icons/）
+*.pdb

@@ -1,0 +1,65 @@
+/**
+ * 岛形态的窗口级样式（灵动岛常驻化）。
+ *
+ * 全部规则都挂在 `<html data-app-mode="island">` 下面，这是设计里约定的
+ * **唯一**形态 CSS 锚点（由 `ShellBridge` 写入）。组件内不得用
+ * `appMode === 'island'` 去写内联样式——否则"形态"这件事会散落在十几个组件里，
+ * 改一次要翻遍全仓。
+ *
+ * 为什么要单独一个文件而不是塞进 index.css：这份样式只在桌面壳的岛形态下有意义，
+ * 和"页面长什么样"是两件事。单独成文件，将来做"岛形态视觉调整"时不会碰到主面板。
+ */
+
+/* 透明背景：窗口本身已经是 transparent（tauri.conf.json，创建期属性、运行时改不了），
+   body 不透明的话用户看到的仍是一整块浅灰。 */
+html[data-app-mode='island'],
+html[data-app-mode='island'] body,
+html[data-app-mode='island'] #root {
+  background: transparent !important;
+  /* 小窗里出现滚动条会毁掉"小组件"的观感，也会让岛面板被顶掉一截。 */
+  overflow: hidden;
+  height: 100%;
+}
+
+/* 岛形态是一个"组件"，不是文档：误选中会出现蓝色高亮块，像坏掉的网页。 */
+html[data-app-mode='island'] body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/**
+ * 让 `Island` 的面板铺满小窗。
+ *
+ * `Island` 的尺寸是为"主面板里的预览条"调的（640×306，居中、距顶 8px）。
+ * 岛形态的窗口只有 400×460，那套尺寸会留下大片空白；而空白区域在透明窗口上
+ * **仍然接收点击**（Tauri 的透明区域默认不吃鼠标穿透），会变成"点哪儿都没反应"
+ * 的死区。所以这里把它撑满，让窗口尺寸与面板尺寸一致。
+ *
+ * 用 `!important` 是因为 `Island` 的高度是内联样式（`style={{ height: '306px' }}`），
+ * 内联样式优先于任何选择器。这是刻意接受的一处"以样式覆盖内联"：另一个选项是
+ * 改 `Island` 的渲染代码，而它有 9 个既有测试契约，不值得为 4 个像素冒险。
+ */
+html[data-app-mode='island'] [data-testid='island-panel'] {
+  top: 6px !important;
+  width: calc(100vw - 12px) !important;
+  max-width: none !important;
+  height: calc(100vh - 12px) !important;
+  border-radius: 22px;
+}
+
+/**
+ * 收起态：`Island` 是卸载的（由 `IslandWindowChrome` 自己画那条窄条），
+ * 所以这里只需保证热区层与键盘唤出入口不会在小窗里露出来。
+ *
+ * 它们是 `Island` 的固有结构（不可读环境下不允许改 `Island.tsx`），在岛形态里
+ * 语义已经不成立（屏幕顶部热区扫一下 → 窗口本身就那么点大），于是隐藏。
+ */
+html[data-app-mode='island'] [data-testid='island-hotzone'],
+html[data-app-mode='island'] [data-testid='island-summon'] {
+  display: none;
+}
+
+/* 岛形态的根容器不参与滚动，避免面板贴顶时出现 1px 抖动。 */
+html[data-app-mode='island'] [data-testid='island-window'] {
+  overflow: hidden;
+}

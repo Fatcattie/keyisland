@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!--
+    托盘专用图标（16 到 32px）。与 app-icon.svg 同一视觉语言，但刻意简化：
+    去掉星星、远处小岛、海浪、高光、条纹，只留「暖黄气球 + 深色吊篮 + 一点锁光」。
+    原因：Windows 托盘实际只显示 16 到 32px，整张插画缩下去会糊成噪点。
+    改设计改这个文件，再用 desktop-app-icon-pipeline 的 render_svg.mjs 渲染。
+  -->
+  <defs>
+    <linearGradient id="tb" gradientUnits="userSpaceOnUse" x1="128" y1="34" x2="128" y2="178">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 吊绳 -->
+  <path d="M 117 172 L 117 192 M 139 172 L 139 192"
+        stroke="#78350f" stroke-width="9" stroke-linecap="round" fill="none"/>
+
+  <!-- 气球：原图标 balloon 路径 ×0.25，保持同一轮廓 -->
+  <path d="M 128 37.5 C 166 37.5 194 68.5 194 103.5 C 194 132 176.5 155 149 166 C 141.5 169.5 135 172.5 128 175 C 121 172.5 114.5 169.5 107 166 C 79.5 155 62 132 62 103.5 C 62 68.5 90 37.5 128 37.5 Z"
+        fill="url(#tb)" stroke="#0b0b0d" stroke-opacity="0.5" stroke-width="10"/>
+
+  <!-- 吊篮 + 锁光 -->
+  <rect x="104" y="190" width="48" height="36" rx="9"
+        fill="#78350f" stroke="#0b0b0d" stroke-opacity="0.5" stroke-width="8"/>
+  <circle cx="128" cy="208" r="9" fill="#fde68a"/>
+</svg>

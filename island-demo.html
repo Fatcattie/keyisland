@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f5f7fb" />
+  <title>密岛 KeyIsland · 灵动岛 Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/framer-motion@10.18.0/dist/framer-motion.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body, #root { min-height: 100%; margin: 0; }
+    body { background: #f5f7fb; color: #172033; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .icon { width: 16px; height: 16px; stroke-width: 1.8; }
+    .top-zone { height: 88px; }
+    .island-shell { transform-origin: top center; filter: drop-shadow(0 24px 30px rgba(20,35,67,.14)); }
+    .island-surface { border-radius: 30px; background: linear-gradient(145deg, #25395f 0%, #182642 48%, #122039 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), inset 0 -14px 24px rgba(4,12,27,.22), 0 18px 46px rgba(20,35,67,.22); }
+    .island-surface::before { content: ""; position: absolute; inset: 1px 1px auto; height: 42%; border-radius: 29px 29px 48% 48%; background: linear-gradient(180deg, rgba(255,255,255,.12), transparent); pointer-events: none; }
+    .noise { background-image: radial-gradient(rgba(255,255,255,.07) .65px, transparent .65px); background-size: 5px 5px; }
+    .soft-control { border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 6px 14px rgba(4,12,27,.08); }
+    .soft-item { border-radius: 16px; }
+    .soft-avatar { border-radius: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 5px 10px rgba(4,12,27,.15); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const { useEffect, useMemo, useRef, useState } = React;
+    const { motion, AnimatePresence } = window.Motion;
+    const { createIcons, Search, LockKeyhole, ShieldCheck, Copy, ArrowUpRight, Command, Plus, ChevronDown, Check, Keyboard } = lucide;
+
+    const items = [
+      { id: 1, title: 'GitHub', account: 'dev@keyisland.app', platform: 'github.com', glyph: 'GH', color: '#202936' },
+      { id: 2, title: 'Notion 工作区', account: 'design@keyisland.app', platform: 'notion.so', glyph: 'N', color: '#62666d' },
+      { id: 3, title: 'Steam', account: 'island_player', platform: 'steamcommunity.com', glyph: 'S', color: '#1f558d' },
+      { id: 4, title: 'Figma', account: 'studio@keyisland.app', platform: 'figma.com', glyph: 'F', color: '#e4634d' }
+    ];
+
+    function Icon({ name, size = 16 }) {
+      return React.createElement('i', { 'data-lucide': name, className: 'icon', style: { width: size, height: size } });
+    }
+
+    function App() {
+      const inputRef = useRef(null);
+      const leaveTimer = useRef(null);
+      const [expanded, setExpanded] = useState(false);
+      const [query, setQuery] = useState('');
+      const [activeIndex, setActiveIndex] = useState(0);
+      const [locked, setLocked] = useState(false);
+      const [toast, setToast] = useState('');
+      const [lastUsed, setLastUsed] = useState(items[0]);
+      const filtered = useMemo(() => items.filter((item) => `${item.title} ${item.platform} ${item.account}`.toLowerCase().includes(query.toLowerCase())), [query]);
+
+      const openIsland = () => {
+        window.clearTimeout(leaveTimer.current);
+        setExpanded(true);
+        window.setTimeout(() => inputRef.current?.focus(), 80);
+      };
+      const closeIsland = () => {
+        window.clearTimeout(leaveTimer.current);
+        leaveTimer.current = window.setTimeout(() => setExpanded(false), 900);
+      };
+      const copy = (item, type = '密码') => {
+        setLastUsed(item);
+        setToast(`${item.title} ${type}已复制 · 30 秒后自动清空`);
+        window.setTimeout(() => setToast(''), 2600);
+      };
+      const selectItem = (item) => {
+        setActiveIndex(Math.max(0, filtered.findIndex((entry) => entry.id === item.id)));
+        copy(item);
+      };
+
+      useEffect(() => {
+        createIcons({ icons: { Search, LockKeyhole, ShieldCheck, Copy, ArrowUpRight, Command, Plus, ChevronDown, Check, Keyboard } });
+      }, [expanded, locked, toast, filtered.length, activeIndex]);
+
+      useEffect(() => {
+        const handleKey = (event) => {
+          if (event.key === 'Escape') { setExpanded(false); inputRef.current?.blur(); return; }
+          if (!expanded) return;
+          if (event.key === 'ArrowDown') { event.preventDefault(); setActiveIndex((index) => Math.min(index + 1, Math.max(filtered.length - 1, 0))); }
+          if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex((index) => Math.max(index - 1, 0)); }
+          if (event.key === 'Enter' && filtered[activeIndex]) { event.preventDefault(); copy(filtered[activeIndex]); }
+          if (event.key === 'Enter' && event.shiftKey && filtered[activeIndex]) { event.preventDefault(); copy(filtered[activeIndex], '账号'); }
+        };
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+      }, [expanded, filtered, activeIndex]);
+
+      return React.createElement('div', { className: 'min-h-screen overflow-hidden' },
+        React.createElement('div', { className: 'top-zone relative', onMouseEnter: openIsland, onMouseLeave: closeIsland },
+          React.createElement(motion.div, { className: 'island-shell fixed left-1/2 top-0 z-30 -translate-x-1/2', animate: { width: expanded ? 640 : 248, height: expanded ? 306 : 46, borderRadius: expanded ? 30 : 999 }, transition: { type: 'spring', stiffness: 420, damping: 34 } },
+            React.createElement('div', { className: 'island-surface relative h-full overflow-hidden border border-white/10', onMouseEnter: openIsland, onMouseLeave: closeIsland },
+              React.createElement('div', { className: 'absolute inset-0 opacity-40 noise' }),
+              React.createElement(AnimatePresence, { mode: 'wait' }, !expanded && React.createElement(motion.button, { key: 'collapsed', initial: { opacity: 0, scale: .96 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: .96 }, onClick: openIsland, className: 'relative flex h-full w-full items-center gap-3 px-5 text-left text-white' }, React.createElement('span', { className: 'soft-avatar flex h-7 w-7 items-center justify-center bg-white/10 text-[10px] font-semibold' }, lastUsed.glyph), React.createElement('span', { className: 'flex-1 text-xs font-medium tracking-wide' }, '密岛', React.createElement('span', { className: 'ml-2 text-white/40' }, '移入顶部唤起')), React.createElement('span', { className: 'flex items-center gap-1.5 text-[10px] text-white/45' }, React.createElement('span', { className: 'h-1.5 w-1.5 rounded-full bg-[#63d7b0]' }), '已解锁'))),
+              React.createElement(AnimatePresence, { mode: 'wait' }, expanded && React.createElement(motion.div, { key: 'expanded', initial: { opacity: 0, y: -9 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -9 }, className: 'relative flex h-full flex-col p-3.5' },
+                React.createElement('div', { className: 'soft-control flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.09] px-4 py-3' }, React.createElement(Icon, { name: locked ? 'lock-keyhole' : 'search', size: 15 }), React.createElement('input', { ref: inputRef, value: query, onChange: (event) => { setQuery(event.target.value); setActiveIndex(0); }, placeholder: locked ? '工具已锁定，点击解锁继续' : '搜索平台、账号或标签…', disabled: locked, className: 'min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35' }), React.createElement('span', { className: 'rounded border border-white/10 px-1.5 py-0.5 text-[10px] text-white/35' }, 'ESC')), 
+                React.createElement('div', { className: 'mt-3 flex items-center justify-between px-1 text-[10px] uppercase tracking-[0.16em] text-white/35' }, React.createElement('span', null, '最近使用'), React.createElement('span', { className: 'flex items-center gap-1' }, React.createElement(Icon, { name: 'shield-check', size: 12 }), '本地加密')), 
+                React.createElement('div', { className: 'mt-2 flex-1 space-y-1.5 overflow-y-auto pr-1' }, filtered.map((item, index) => React.createElement('button', { key: item.id, onClick: () => selectItem(item), className: `soft-item flex w-full items-center gap-3 border px-3.5 py-3 text-left transition ${index === activeIndex ? 'border-white/15 bg-white/[0.14] shadow-[inset_0_1px_0_rgba(255,255,255,.1),0_6px_14px_rgba(4,12,27,.08)]' : 'border-transparent hover:bg-white/[0.08]'}` }, React.createElement('span', { className: 'soft-avatar flex h-9 w-9 items-center justify-center text-[10px] font-semibold text-white', style: { backgroundColor: item.color } }, item.glyph), React.createElement('span', { className: 'min-w-0 flex-1' }, React.createElement('span', { className: 'block truncate text-xs font-semibold text-white/90' }, item.title), React.createElement('span', { className: 'mt-0.5 block truncate text-[10px] text-white/40' }, item.account)), React.createElement('span', { className: 'rounded-xl p-2 text-white/40 transition hover:bg-white/10 hover:text-white', title: '复制密码', onClick: (event) => { event.stopPropagation(); copy(item); } }, React.createElement(Icon, { name: 'copy', size: 14 })))), filtered.length === 0 && React.createElement('div', { className: 'py-8 text-center text-xs text-white/40' }, '没有找到匹配的资产')), 
+                React.createElement('div', { className: 'mt-2 flex items-center justify-between border-t border-white/10 px-1 pt-2 text-[10px] text-white/35' }, React.createElement('span', { className: 'flex items-center gap-1.5' }, React.createElement(Icon, { name: 'keyboard', size: 12 }), '↑ ↓ 选择 · Enter 复制密码 · Shift + Enter 复制账号'), React.createElement('button', { onClick: () => setLocked(!locked), className: 'rounded-xl px-3 py-1.5 transition hover:bg-white/10 hover:text-white' }, locked ? '解锁' : '立即锁定'))
+              )),
+            )
+          )
+        ),
+        React.createElement('main', { className: 'mx-auto flex min-h-[calc(100vh-88px)] max-w-5xl flex-col items-center justify-center px-6 pb-16 text-center' },
+          React.createElement('div', { className: 'mb-5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#63709a]' }, React.createElement(Icon, { name: 'command', size: 14 }), 'KeyIsland / Dynamic Island Demo'),
+          React.createElement('h1', { className: 'text-3xl font-semibold tracking-[-0.03em] text-[#172033] md:text-5xl' }, '把密码工具藏进屏幕顶部'),
+          React.createElement('p', { className: 'mt-4 max-w-xl text-sm leading-6 text-[#7b8699] md:text-base' }, '鼠标移入顶部热区，灵动岛展开并自动聚焦搜索。整个闭环不离开当前窗口，适合高频复制与快速跳转。'),
+          React.createElement('div', { className: 'mt-10 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-3' }, [['01', '移入顶部', '150–200ms 展开'], ['02', '搜索资产', '支持键盘选择'], ['03', '复制即走', '30s 自动清空']].map(([number, title, detail]) => React.createElement('div', { key: number, className: 'rounded-xl border border-[#e2e7ef] bg-white p-4 shadow-[0_8px_24px_rgba(29,43,77,0.04)]' }, React.createElement('div', { className: 'text-[10px] font-semibold tracking-[0.18em] text-[#9aa3b2]' }, number), React.createElement('div', { className: 'mt-3 text-sm font-semibold text-[#34415d]' }, title), React.createElement('div', { className: 'mt-1 text-xs text-[#9aa3b2]' }, detail)))),
+          React.createElement('div', { className: 'mt-8 flex items-center gap-2 text-xs text-[#9aa3b2]' }, React.createElement('span', { className: 'h-1.5 w-1.5 rounded-full bg-[#51c89d]' }), '演示模式 · 不会连接云端 · 数据仅用于交互展示')
+        ),
+        toast && React.createElement(motion.div, { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, className: 'fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-white/10 bg-[#182642] px-5 py-3.5 text-xs font-medium text-white shadow-[0_14px_34px_rgba(24,38,66,0.24)]' }, React.createElement(Icon, { name: 'check', size: 15 }), toast)
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>

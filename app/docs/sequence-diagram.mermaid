@@ -1,0 +1,143 @@
+%% 密岛 KeyIsland — 灵动岛常驻化 · 时序图（提取自 docs/island-persistent-design.md §4）
+%% 本文件含 5 张图；多数渲染器只渲染第一张，权威版本见 md 文档。
+
+%% ========== ① 启动 → main 打开 → 解锁 ==========
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant T as Tauri/Rust
+    participant W as main 窗口(webview)
+    participant SG as SessionGate
+    participant VC as VaultClient
+    participant SB as ShellBridge
+
+    U->>T: 双击 keyisland.exe
+    T->>T: setup(): Store::open → manage(AppState)
+    T->>T: manage(ShellState{mode:Full, session:Uninitialized})
+    T->>T: shell::tray::build(app)
+    T->>W: 创建 main(1180x820, 有装饰)
+    W->>SG: 挂载 → client.status()
+    SG->>VC: status()
+    VC-->>SG: uninitialized | locked | unlocked
+    SG->>SB: 挂载 ShellBridge
+    SB->>T: shell_mode() / 订阅 shell://mode,lock-requested,quit-requested
+    SB->>T: shell_set_session(status)
+    T->>T: tray.syncSession()
+    U->>SG: 输入主密码解锁
+    SG->>VC: unlock(masterPassword)
+    VC-->>SG: snapshot(unlocked, unlockedUntil)
+    SG->>SB: status 变化 → shell_set_session(unlocked)
+    T->>T: tray.syncSession(Unlocked)
+
+%% ========== ② 关闭 → 变形为岛 + 收进托盘 ==========
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant W as main 窗口
+    participant T as Rust(shell)
+    participant G as Geometry
+    participant SB as ShellBridge
+    participant ST as ui-store
+    participant SG as SessionGate
+
+    U->>W: 点 × 或 Alt+F4
+    W->>T: WindowEvent::CloseRequested
+    T->>T: api.prevent_close()
+    T->>T: decideCloseAction(session)
+    alt session == uninitialized
+        T->>W: hide()
+        T->>T: mode = Hidden
+    else 已建库(locked 或 unlocked)
+        T->>W: set_min_size(None) / set_decorations(false) / set_shadow(false)
+        T->>W: set_resizable(false) / set_always_on_top(true) / set_skip_taskbar(true)
+        T->>G: anchoredTopCenter(pos, full, 320x44)
+        G-->>T: (x, y)
+        T->>G: clampIntoWorkArea((x,y), 320x44, workArea)
+        T->>W: set_size(320x44) + set_position(x,y)
+        T->>T: mode = Island, islandExpanded = false
+        T->>T: stateFile.save(fullSize)
+    end
+    T->>SB: emit shell://mode {mode, expanded:false}
+    SB->>ST: setAppMode('island')
+    SB->>SG: documentElement.dataset.appMode = 'island'
+    SG->>SG: MainPanel 加 hidden(仍挂载) / 渲染 Island variant=standalone
+    Note over T,W: 全程不调用 hide() → 不触发 visibilitychange<br/>→ 不会误触 lockForSystemEvent
+    U->>W: 鼠标移到岛条上
+    SG->>ST: openIsland() → phase=opening
+    SB->>T: shell_set_island_expanded(true)
+    T->>G: anchoredTopCenter(pos, 320x44, 400x460)
+    T->>W: set_size(400x460) + set_position(新锚点)
+
+%% ========== ③ 右键岛 → 菜单 → 打开主面板 ==========
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant CH as IslandWindowChrome
+    participant M as IslandContextMenu
+    participant MA as MenuActions
+    participant SP as ShellPort
+    participant T as Rust(shell)
+    participant W as main 窗口
+    participant SG as SessionGate
+
+    U->>CH: 在岛窗口任意处右键
+    CH->>CH: 若 e.defaultPrevented 或已存在 island-context-menu → 让位
+    CH->>MA: buildIslandMenuActions(ctx)
+    MA-->>CH: 六项（打开主面板/新建卡片/设置/立即锁定/开机自启开关/退出）
+    CH->>M: 渲染（open=true, actions）
+    U->>M: 点「打开主面板」
+    M->>M: run(): 执行后关闭
+    M->>SG: onOpenMainPanel()
+    M->>SP: showMain()
+    SP->>T: invoke shell_show_main
+    T->>W: set_min_size(960x640) / set_decorations(true) / set_shadow(true)
+    T->>W: set_always_on_top(false) / set_skip_taskbar(false) / set_resizable(true)
+    T->>W: set_size(fullSize) + set_position(记忆位置)
+    T->>W: unminimize() → show() → set_focus()
+    T->>T: mode = Full
+    T->>SP: emit shell://mode {mode:full}
+    SP->>SG: setAppMode('full') → MainPanel 去 hidden
+
+%% ========== ④ 托盘退出 → 进程结束 ==========
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant TR as 托盘
+    participant T as Rust(shell)
+    participant SB as ShellBridge
+    participant VC as VaultClient
+
+    U->>TR: 右键托盘 → 退出密岛
+    TR->>T: on_menu_event("tray.quit")
+    T->>T: 启动 1500ms 看门狗
+    T->>SB: emit shell://quit-requested
+    SB->>VC: dispose()
+    SB->>T: invoke shell_quit
+    T->>T: app.exit(0)
+    Note over T: 若 1500ms 内未收到 shell_quit<br/>看门狗强制 app.exit(0)
+
+%% ========== ⑤ 自动锁定 / 系统锁屏 在岛形态下 ==========
+sequenceDiagram
+    autonumber
+    participant SG as SessionGate
+    participant VC as VaultClient
+    participant IS as Island(standalone)
+    participant SB as ShellBridge
+    participant T as Rust
+
+    Note over SG: 岛形态下 SessionGate 仍是根节点，定时器与监听器不中断
+    alt 自动锁定到期（unlockedUntil + 250ms）
+        SG->>VC: status()
+    else 系统锁屏 / 休眠 / 窗口失焦被遮挡
+        SG->>VC: lockForSystemEvent()
+    end
+    VC-->>SG: snapshot(locked)
+    SG->>IS: status='locked'
+    IS->>IS: 清空 items / query / activeIndex
+    IS-->>SG: 渲染锁定态岛面
+    SG->>SB: shell_set_session('locked')
+    SB->>T: invoke shell_set_session
+    T->>T: tray.syncSession(Locked)
+    SG->>SB: 用户点「解锁」→ showMain()
+    SB->>T: shell_show_main
+    T->>T: 还原全形态 → 前端渲染 UnlockScreen

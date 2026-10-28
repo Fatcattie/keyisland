@@ -1,0 +1,55 @@
+graph TD
+    subgraph FE["React + TypeScript Renderer (WebView2) — 仅 UI + DTO"]
+        F1["features/* (Island/Main/Unlock/Settings)"]
+        F2["stores/ui-store.ts (仅 UI 状态)"]
+        F3["services/vault-client.ts<br/>TauriVaultClient 适配器<br/>(实现 VaultClient 接口)"]
+        F4["lib/hotzone.ts (注真实屏宽)"]
+    end
+
+    subgraph TT["src-tauri (Rust Host)"]
+        T1["main.rs / tauri.conf.json"]
+        T2["commands.rs (Tauri command 契约)"]
+        T3["state.rs (托管 VaultState)"]
+        T4["capabilities/ (权限白名单)"]
+    end
+
+    subgraph AC["app-commands (Rust 业务服务)"]
+        S1["VaultService"]
+        S2["AuthService (会话/DEK/冷却)"]
+        S3["KeyslotService"]
+        S4["ItemService"]
+        S5["SearchService"]
+        S6["BackupService"]
+        S7["GeneratorService"]
+        S8["ClipboardService (Win32)"]
+        S9["WindowsService / HotzoneService"]
+    end
+
+    subgraph VC["vault-core (Rust crate)"]
+        C1["crypto.rs (Argon2id / AES-256-GCM)"]
+        C2["keyslots.rs"]
+        C3["models.rs"]
+        C4["repository.rs (SQLCipher)"]
+        C5["backup.rs"]
+    end
+
+    subgraph WIN["Windows 平台能力"]
+        W1["SQLCipher SQLite"]
+        W2["Windows 热区/窗口样式<br/>(WS_EX_NOACTIVATE, WDA_EXCLUDEFROMCAPTURE)"]
+        W3["系统锁屏/休眠事件"]
+        W4["OpenClipboard + 序列号检测"]
+        W5["ShellExecute / Windows Hello"]
+    end
+
+    FE -->|invoke()| TT
+    TT -->|emit session://* system://* clipboard://* island://*| FE
+    T2 --> AC
+    AC --> VC
+    VC --> WIN
+    S2 -.DEK/KEK 永不出 Rust 进程.-> VC
+
+    style FE fill:#e8f0fe,stroke:#4285f4
+    style TT fill:#fef7e0,stroke:#f9ab00
+    style AC fill:#e6f4ea,stroke:#34a853
+    style VC fill:#e6f4ea,stroke:#34a853
+    style WIN fill:#fce8e6,stroke:#ea4335

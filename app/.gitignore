@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.local
+*.log
+.qa-*.txt
+.tmp-*
+.build-verify/
+.vite/
+.iconwork/
+.DS_Store
+Thumbs.db
+artifacts/

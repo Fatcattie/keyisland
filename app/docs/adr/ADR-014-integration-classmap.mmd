@@ -1,0 +1,132 @@
+classDiagram
+    %% ===== 前端 (TypeScript, WebView2) =====
+    class VaultClient {
+        <<interface>>
+        +status() Promise~SessionState~
+        +initialize(input) Promise~RecoveryBundle~
+        +unlock(password) Promise~SessionState~
+        +lock(reason) Promise~SessionState~
+        +listItems(filter) Promise~ItemSummary[]~
+        +getItem(id) Promise~ItemDetail~
+        +createItem(input) Promise~ItemSummary~
+        +updateItem(id, input) Promise~ItemSummary~
+        +deleteItem(id) Promise~void~
+        +copyPassword(id) Promise~CopyReceipt~
+        +revealPassword(id) Promise~string~
+        +exportBackup(password) Promise~string~
+        +importBackup(input) Promise~ImportResult~
+        +auditPasswordHealth() Promise~HealthReport~
+        +rotateRecoveryKey(pwd) Promise~RecoveryBundle~
+        +dispose() Promise~void~
+        +~约 50 个方法, 与 SDD §5.2 超集对应~
+    }
+
+    class TauriVaultClient {
+        -invoke: TauriInvokeFn
+        +status()
+        +unlock(password)
+        +copyPassword(id)
+        +~实现 VaultClient 全部方法, 经 invoke 调用~
+    }
+
+    class MemoryVaultClient {
+        -storage: VaultStorage
+        +~浏览器/测试用, 进程内 TS 实现~
+    }
+
+    class VaultProvider {
+        +client: VaultClient
+        +useVaultClient()
+    }
+
+    class SessionGate {
+        +订阅 Tauri 事件 session://* system://*
+    }
+
+    class ClipboardPort {
+        <<interface>>
+        +write(text) Promise~void~
+        +read() Promise~string|null~
+        +clear() Promise~void~
+    }
+
+    class BrowserClipboardPort {
+        +~navigator.clipboard~
+    }
+
+    class TauriClipboardPort {
+        +~Win32 OpenClipboard + 序列号~
+    }
+
+    %% ===== Rust 侧 (src-tauri + crates) =====
+    class Commands {
+        <<tauri::command>>
+        +unlock_with_password(password)
+        +copy_password(id)
+        +list_items(filter)
+        +export_backup(password)
+        +rotate_recovery_key(pwd)
+        +~命令契约, 与 VaultClient 1:1~
+    }
+
+    class AppState {
+        -vault_state: Mutex~VaultState~
+        -clipboard_state: ClipboardState
+    }
+
+    class VaultService
+    class AuthService {
+        -dek: Option~Zeroizing~Vec~u8~~
+        -kek_a / kek_b
+        -cooldown
+    }
+    class KeyslotService
+    class ItemService {
+        -decrypt_in_rust_memory()
+    }
+    class SearchService
+    class BackupService
+    class GeneratorService
+    class ClipboardService {
+        -ttl_timers
+        -digest_registry
+    }
+    class WindowsService
+    class HotzoneService
+
+    class Crypto {
+        +argon2id()
+        +aes256gcm_encrypt/decrypt()
+    }
+    class Repository {
+        +SQLCipher open/migrate
+    }
+
+    %% ===== 关系 =====
+    VaultClient <|.. TauriVaultClient : 实现
+    VaultClient <|.. MemoryVaultClient : 实现(测试)
+    VaultProvider o-- VaultClient
+    SessionGate --> VaultClient : useVaultClient
+    ClipboardPort <|.. BrowserClipboardPort : 实现
+    ClipboardPort <|.. TauriClipboardPort : 实现(目标)
+
+    TauriVaultClient ..> Commands : invoke()
+    Commands --> AppState
+    AppState *-- AuthService
+    AppState *-- ClipboardService
+    Commands --> VaultService
+    Commands --> ItemService
+    Commands --> BackupService
+    Commands --> GeneratorService
+    AuthService --> Crypto : 派生/解包 DEK
+    ItemService --> Crypto : 解密(内存)
+    ItemService --> Repository
+    KeyslotService --> Crypto
+    VaultService --> Repository
+    BackupService --> Crypto
+    ClipboardService --> WindowsService : Win32 剪贴板
+    HotzoneService --> WindowsService : 热区轮询
+    WindowsService --> Repository : SQLCipher 文件
+
+    note for AuthService "DEK/KEK 永不出 Rust 进程"
+    note for TauriVaultClient "前端永不见 DEK/明文(除 reveal 瞬时)"

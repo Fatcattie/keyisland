@@ -1,0 +1,23 @@
+graph TD
+    A["A. 先行 Spike<br/>S0 脚手架 / S1 SQLCipher / S2 WS_EX_NOACTIVATE / S3 内存擦除<br/>(本机无 Rust 工具链, 需在目标 Windows 机执行)"]
+    B["B. Rust 核心移植<br/>vault-core: crypto/keyslots/models/repository/backup<br/>+ Rust 测试(对照 tests/security 向量)"]
+    C["C. Tauri 外壳 + Commands<br/>src-tauri: main/commands/state/conf/capabilities<br/>+ 窗口 island/main/unlock/confirm"]
+    D["D. 前端桥接<br/>createTauriVaultClient / App+VaultProvider 换源<br/>SessionGate 换事件订阅 / hotzone 注屏宽 / 移除生产存储依赖"]
+    E["E. Windows 集成<br/>热区轮询 / 锁屏休眠事件 / WDA_EXCLUDEFROMCAPTURE<br/>/ ShellExecute / Hello(P1) / Native Messaging(P1)"]
+    F["F. 加固与发布<br/>常驻内存<80MB / 启动默认锁 / 0 网络 / 签名安装包"]
+    G["G. P1 扩展<br/>浏览器扩展+NM / 热键捕获 / CSV / 拼音(已TS) / 销毁 / TOTP"]
+
+    A -->|全绿 Gate| B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+
+    style A fill:#fef7e0,stroke:#f9ab00
+    style B fill:#e6f4ea,stroke:#34a853
+    style C fill:#e6f4ea,stroke:#34a853
+    style D fill:#e8f0fe,stroke:#4285f4
+    style E fill:#fce8e6,stroke:#ea4335
+    style F fill:#e6f4ea,stroke:#34a853
+    style G fill:#f3e8fd,stroke:#a142f4

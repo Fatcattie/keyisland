@@ -1,0 +1,144 @@
+%% 密岛 KeyIsland — 灵动岛常驻化 · 类图（提取自 docs/island-persistent-design.md §3.3）
+%% 说明：本文件含两张独立图；多数渲染器只渲染第一张，权威版本见 md 文档。
+
+%% ========== 1) Rust 壳（窗口形态 / 托盘 / 几何） ==========
+classDiagram
+    direction LR
+
+    class AppMode {
+        <<enumeration>>
+        Full
+        Island
+        Hidden
+    }
+    class SessionMirror {
+        <<enumeration>>
+        Uninitialized
+        Locked
+        Unlocked
+    }
+    class ShellState {
+        +mode: AppMode
+        +session: SessionMirror
+        +islandExpanded: bool
+        +fullSize: Option
+        +morphing: bool
+        +onCloseRequested(app)
+        +enterIsland(app)
+        +showMain(app)
+        +applyExpanded(app, expanded)
+        +syncSession(app, session)
+    }
+    class Geometry {
+        <<module>>
+        +ISLAND_COLLAPSED: Size
+        +ISLAND_EXPANDED: Size
+        +FULL_DEFAULT: Size
+        +FULL_MIN: Size
+        +islandSize(expanded) Size
+        +anchoredTopCenter(pos, cur, next) Pos
+        +clampIntoWorkArea(pos, size, area) Pos
+        +decideCloseAction(session) CloseAction
+    }
+    class ShellCommands {
+        <<commands>>
+        +shell_mode() ShellModeDto
+        +shell_show_main() Result
+        +shell_enter_island() Result
+        +shell_set_island_expanded(expanded) Result
+        +shell_set_session(status) Result
+        +shell_quit() Result
+    }
+    class TrayController {
+        +openItem: MenuItem
+        +lockItem: MenuItem
+        +quitItem: MenuItem
+        +build(app) TrayController
+        +syncSession(app, session)
+    }
+    class ShellStateFile {
+        +islandPos: Pos
+        +fullSize: Size
+        +closeHintSeen: bool
+        +load(appDir) ShellStateFile
+        +save(appDir)
+    }
+
+    ShellState --> AppMode
+    ShellState --> SessionMirror
+    ShellState --> Geometry : 用锚点/夹取
+    ShellCommands --> ShellState
+    TrayController --> ShellState : 读 session 决定置灰
+    ShellStateFile --> ShellState : 恢复几何
+
+%% ========== 2) 前端（形态桥 / 岛 / 菜单） ==========
+classDiagram
+    direction LR
+
+    class UiStore {
+        +appMode: AppMode
+        +island: IslandUiState
+        +session: SessionUiState
+        +setAppMode(mode)
+        +openIsland()
+        +closeIsland()
+        +finishClosing()
+    }
+    class ShellPort {
+        <<interface>>
+        +available() bool
+        +readMode() ShellModeEvent
+        +showMain()
+        +enterIsland()
+        +setExpanded(expanded)
+        +setSession(status)
+        +quit()
+        +onMode(cb)
+        +onLockRequested(cb)
+        +onQuitRequested(cb)
+    }
+    class ShellBridge {
+        +subscribeShellEvents()
+        +pushSession(status)
+        +pushIslandPhase(phase)
+        +showFirstCloseHint()
+    }
+    class SessionGate {
+        +snapshot: SessionSnapshot
+        +settingsOpen: bool
+        +renderFullSlot()
+        +renderIslandMode()
+        +handleTrayLock()
+    }
+    class Island {
+        +variant: preview|standalone
+        +status: SessionStatus
+        +onLock()
+        +onRequestUnlock()
+        +onOpenSettings()
+    }
+    class IslandContextMenu {
+        +open: bool
+        +actions: IslandMenuAction[]
+        +onClose()
+    }
+    class IslandWindowChrome {
+        +active: bool
+        +handleWindowContextMenu(e)
+        +collapseOnBlur()
+        +dragRegion()
+    }
+    class MenuActions {
+        <<module>>
+        +buildIslandMenuActions(ctx) IslandMenuAction[]
+    }
+
+    ShellBridge --> ShellPort
+    ShellBridge --> UiStore : setAppMode
+    SessionGate --> UiStore : 读 appMode
+    SessionGate --> Island
+    SessionGate --> IslandWindowChrome
+    IslandWindowChrome --> IslandContextMenu
+    IslandContextMenu --> MenuActions
+    Island --> IslandContextMenu
+    IslandContextMenu --> ShellPort : showMain / quit

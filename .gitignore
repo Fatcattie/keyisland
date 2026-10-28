@@ -1,0 +1,37 @@
+# ============ 依赖与构建产物 ============
+node_modules/
+dist/
+dist-ssr/
+coverage/
+artifacts/
+.iconwork/
+target/
+src-tauri/target/
+
+# ============ 本地临时文件 ============
+*.local
+*.log
+.tmp-*
+.qa-*.txt
+.build-verify/
+.vite/
+vite.config.ts.timestamp-*.mjs
+vitest.security.config.ts.timestamp-*.mjs
+.DS_Store
+Thumbs.db
+
+# ============ 编辑器 / 系统 ============
+.idea/
+.vscode/
+*.swp
+
+# ============ AI 助手本地状态（非源码） ============
+.workbuddy-ai/
+.workbuddy/
+.claude/
+
+# ============ 设计文档（本地保留，不入公开仓库） ============
+# 含加密方案 / 密钥派生 / 威胁模型等安全设计细节，公开会暴露攻击面
+/SDD.md
+/prd.md
+/prd.html

@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant UI as React (WebView2)
+    participant VC as TauriVaultClient (TS 适配器)
+    participant CMD as Tauri Command (Rust)
+    participant AUTH as AuthService (Rust)
+    participant ITEM as ItemService (Rust)
+    participant CLIP as ClipboardService (Rust + Win32)
+    participant DB as SQLCipher (Rust)
+
+    Note over UI,DB: 解锁 → 复制密码（DEK 全程不越 Rust 边界）
+    UI->>VC: unlock(password)
+    VC->>CMD: invoke('unlock_with_password', {password})
+    CMD->>AUTH: verify + derive KEK-A + unwrap DEK
+    AUTH->>DB: load keyslots
+    AUTH-->>CMD: SessionState (status=unlocked, 无 DEK)
+    CMD-->>VC: SessionState
+    VC-->>UI: SessionState (前端仅持状态, 不持 DEK)
+
+    UI->>VC: copyPassword(id)
+    VC->>CMD: invoke('copy_password', {id})
+    CMD->>ITEM: resolve item + visibility/authz
+    ITEM->>DB: load encrypted field (password_enc)
+    ITEM->>ITEM: decrypt in Rust memory with DEK
+    ITEM->>CLIP: writeClipboard(plaintext)
+    CLIP->>CLIP: 计算 SHA-256 摘要, 登记 TTL 定时清理
+    CLIP->>W: OpenClipboard / SetClipboardData (Windows)
+    CLIP-->>CMD: CopyReceipt {token, field, expiresAt, ttlMs}
+    CMD-->>VC: CopyReceipt
+    VC-->>UI: CopyReceipt (仅展示 Toast, 不持明文)
+
+    Note over CLIP,W: 到期或锁定 → 仅当内容仍属密岛才清空
+    CLIP->>W: GetClipboardSequenceNumber 比对 → 若被覆盖则跳过

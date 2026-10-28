@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="sky" gradientUnits="userSpaceOnUse" x1="512" y1="0" x2="512" y2="1024">
+      <stop offset="0" stop-color="#1e3a8a"/>
+      <stop offset="0.5" stop-color="#16203a"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
+    </linearGradient>
+    <linearGradient id="stripA" gradientUnits="userSpaceOnUse" x1="512" y1="150" x2="512" y2="700">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="stripB" gradientUnits="userSpaceOnUse" x1="512" y1="150" x2="512" y2="700">
+      <stop offset="0" stop-color="#fb7185"/>
+      <stop offset="1" stop-color="#e11d48"/>
+    </linearGradient>
+    <linearGradient id="basket" gradientUnits="userSpaceOnUse" x1="512" y1="740" x2="512" y2="840">
+      <stop offset="0" stop-color="#d97706"/>
+      <stop offset="1" stop-color="#92400e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fbbf24" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#fbbf24" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="224"/>
+    </clipPath>
+    <clipPath id="balloon">
+      <path d="M 512 150 C 664 150 776 274 776 414 C 776 528 706 620 596 664 C 566 678 540 690 512 700 C 484 690 458 678 428 664 C 318 620 248 528 248 414 C 248 274 360 150 512 150 Z"/>
+    </clipPath>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="softer" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <rect width="1024" height="1024" fill="url(#sky)"/>
+
+    <!-- 星 -->
+    <g fill="#ffffff">
+      <circle cx="150" cy="210" r="7" opacity="0.7"/>
+      <circle cx="880" cy="180" r="8" opacity="0.75"/>
+      <circle cx="820" cy="420" r="6" opacity="0.5"/>
+      <circle cx="180" cy="470" r="6" opacity="0.45"/>
+      <circle cx="300" cy="120" r="5" opacity="0.5"/>
+      <circle cx="640" cy="96" r="4" opacity="0.4"/>
+    </g>
+
+    <!-- 远处的小岛：只有剪影 + 一扇暖灯窗（32px 下干净，不糊成噪点） -->
+    <g>
+      <path d="M 596 820 C 682 786 806 792 898 820 Z" fill="#0e7490"/>
+      <path d="M 596 820 C 682 786 806 792 898 820" fill="none" stroke="#5eead4" stroke-width="5" opacity="0.6"/>
+      <!-- 小屋 -->
+      <rect x="726" y="768" width="62" height="52" rx="8" fill="#0b1220"/>
+      <path d="M 716 770 L 757 736 L 798 770 Z" fill="#0b1220"/>
+      <rect x="748" y="788" width="18" height="18" rx="3" fill="#fcd34d"/>
+      <circle cx="757" cy="797" r="26" fill="#fbbf24" opacity="0.3" filter="url(#softer)"/>
+    </g>
+
+    <!-- 热气球 -->
+    <circle cx="512" cy="420" r="236" fill="url(#glow)"/>
+    <g clip-path="url(#balloon)">
+      <rect x="200" y="120" width="620" height="620" fill="url(#stripA)"/>
+      <path d="M 300 130 C 300 300 300 480 300 660 L 420 660 C 420 480 420 300 420 130 Z" fill="url(#stripB)"/>
+      <path d="M 604 130 C 604 300 604 480 604 660 L 724 660 C 724 480 724 300 724 130 Z" fill="url(#stripB)"/>
+      <path d="M 200 420 C 320 396 420 444 512 420 C 604 396 704 444 824 420 L 824 500 L 200 500 Z" fill="#0b1220" opacity="0.26"/>
+      <path d="M 200 300 C 320 276 420 324 512 300 C 604 276 704 324 824 300 L 824 344 L 200 344 Z" fill="#ffffff" opacity="0.13"/>
+    </g>
+    <path d="M 512 150 C 664 150 776 274 776 414 C 776 528 706 620 596 664 C 566 678 540 690 512 700 C 484 690 458 678 428 664 C 318 620 248 528 248 414 C 248 274 360 150 512 150 Z" fill="none" stroke="#0b0b0d" stroke-width="9" opacity="0.4"/>
+    <ellipse cx="408" cy="268" rx="56" ry="84" fill="#ffffff" opacity="0.18" filter="url(#soft)"/>
+
+    <!-- 吊绳 -->
+    <path d="M 470 684 L 484 752" stroke="#fafaf9" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.9"/>
+    <path d="M 554 684 L 540 752" stroke="#fafaf9" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.9"/>
+    <path d="M 484 752 L 540 752" stroke="#fafaf9" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.9"/>
+
+    <!-- 吊篮 + 保险箱 -->
+    <rect x="456" y="748" width="112" height="96" rx="18" fill="url(#basket)"/>
+    <rect x="456" y="748" width="112" height="96" rx="18" fill="none" stroke="#0b0b0d" stroke-width="7" opacity="0.45"/>
+    <rect x="470" y="762" width="84" height="68" rx="12" fill="#78350f"/>
+    <rect x="470" y="762" width="84" height="68" rx="12" fill="none" stroke="#fbbf24" stroke-width="4" opacity="0.55"/>
+    <circle cx="512" cy="790" r="21" fill="#fde68a"/>
+    <circle cx="512" cy="790" r="21" fill="none" stroke="#0b0b0d" stroke-width="5" opacity="0.45"/>
+    <circle cx="512" cy="790" r="7" fill="#0b0b0d"/>
+    <rect x="509" y="790" width="6" height="15" rx="3" fill="#0b0b0d"/>
+
+    <!-- 海面 -->
+    <path d="M 0 878 C 140 846 280 894 420 876 C 560 858 700 900 840 878 C 920 866 980 876 1024 888 L 1024 1024 L 0 1024 Z" fill="#0b1220"/>
+    <path d="M 0 878 C 140 846 280 894 420 876 C 560 858 700 900 840 878 C 920 866 980 876 1024 888" fill="none" stroke="#2dd4bf" stroke-width="8" opacity="0.55"/>
+    <ellipse cx="512" cy="792" rx="96" ry="40" fill="#fbbf24" opacity="0.22" filter="url(#softer)"/>
+  </g>
+</svg>

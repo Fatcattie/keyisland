@@ -131,6 +131,28 @@ export function Island({ status, onLock, onRequestUnlock, onOpenSettings }: Isla
         transition: SURFACE_SPRING,
       };
 
+  /**
+   * 面板的入场动画：与 `surfaceMotion` 相同，**外加 `x: '-50%'` 承担水平居中**。
+   *
+   * 为什么不能只靠 class 的 `-translate-x-1/2`：framer-motion 会把 `transform`
+   * 以内联样式写回元素，内联优先级最高，Tailwind 生成的那条 `translate(-50%)`
+   * 会被整条盖掉。于是面板只剩 `left: 50%` 生效 —— 从窗口正中间开始往右排，
+   * 右半截被窗口裁掉。岛形态窗口只有 400px 宽，用户看到的就是「岛只有半边」。
+   *
+   * 把居中交给 framer，位移/缩放/居中就共用同一个 transform，谁也不会覆盖谁。
+   */
+  const panelMotion = reducedMotion
+    ? {
+        initial: { x: '-50%', opacity: 0 },
+        animate: { x: '-50%', opacity: 1 },
+        transition: { duration: 0.12 } as Transition,
+      }
+    : {
+        initial: { x: '-50%', y: -44, opacity: 0, scale: 0.96 },
+        animate: { x: '-50%', y: 0, opacity: 1, scale: 1 },
+        transition: SURFACE_SPRING,
+      };
+
   const [items, setItems] = useState<ItemSummary[]>([]);
   // 快捷新建（SDD Phase 3）：不解锁主面板就能在岛内建卡并生成密码。
   const [createOpen, setCreateOpen] = useState(false);
@@ -1292,7 +1314,7 @@ export function Island({ status, onLock, onRequestUnlock, onOpenSettings }: Isla
             // 面板保持 `fixed`（页面级浮层）；`fixed` 本身即绝对定位菜单的包含块，
             // 不需要再叠 `relative`——两个 position 工具类会互相覆盖。
             <motion.div
-              {...surfaceMotion}
+              {...panelMotion}
               ref={panelRef}
               role="dialog"
               aria-label="密岛灵动岛"

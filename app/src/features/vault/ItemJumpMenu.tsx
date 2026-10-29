@@ -34,9 +34,9 @@ export interface ItemJumpMenuProps {
 
 /** 菜单项通用样式。 */
 const ITEM_CLASS =
-  'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-zinc-700 ' +
-  'transition-colors hover:bg-zinc-100 focus-visible:bg-zinc-100 focus-visible:outline-none ' +
-  'disabled:cursor-not-allowed disabled:text-zinc-300 disabled:hover:bg-transparent';
+  'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-fg-muted ' +
+  'transition-colors hover:bg-surface-sunken focus-visible:bg-surface-sunken focus-visible:outline-none ' +
+  'disabled:cursor-not-allowed disabled:text-fg-faint disabled:hover:bg-transparent';
 
 interface Position {
   top: number;
@@ -111,7 +111,7 @@ export function ItemJumpMenu({
       aria-label="选择跳转目标"
       data-testid="item-jump-menu"
       style={{ position: 'fixed', top: position.top, right: position.right }}
-      className="z-50 w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg"
+      className="z-50 w-44 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-lg"
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           // 只关菜单，不要把 Esc 冒泡给主面板（否则会顺带退出选择模式 / 关详情页）。

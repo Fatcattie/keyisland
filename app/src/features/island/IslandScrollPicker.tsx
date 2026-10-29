@@ -170,7 +170,7 @@ export function IslandScrollPicker({
       </div>
 
       <p className="flex items-center justify-between text-[10px] text-white/35">
-        <span>滚轮翻卡片 · Enter 复制密码 · ⇧Enter 复制账号</span>
+        <span>滚轮翻卡片 · 中键退出 · Enter 复制密码 · ⇧Enter 复制账号</span>
         <button
           type="button"
           onClick={onClose}

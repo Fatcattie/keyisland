@@ -96,7 +96,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-900/30 px-4 py-10 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/40 px-4 py-10 backdrop-blur-[2px]"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -110,15 +110,15 @@ export function Modal({
         aria-labelledby="modal-title"
         aria-describedby={description !== undefined ? 'modal-description' : undefined}
         onKeyDown={handleKeyDown}
-        className={`w-full ${widthClass} rounded-card border border-zinc-200 bg-white shadow-card`}
+        className={`w-full ${widthClass} rounded-card border border-line bg-surface shadow-card`}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-zinc-100 px-6 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-line-subtle px-6 py-4">
           <div>
-            <h2 id="modal-title" className="text-sm font-semibold text-zinc-900">
+            <h2 id="modal-title" className="text-sm font-semibold text-fg">
               {title}
             </h2>
             {description !== undefined ? (
-              <p id="modal-description" className="mt-1 text-xs leading-5 text-zinc-500">
+              <p id="modal-description" className="mt-1 text-xs leading-5 text-fg-faint">
                 {description}
               </p>
             ) : null}
@@ -127,14 +127,14 @@ export function Modal({
             type="button"
             aria-label="关闭"
             onClick={onClose}
-            className="rounded-full px-2 py-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+            className="rounded-full px-2 py-1 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
           >
             ✕
           </button>
         </header>
         <div className="px-6 py-5">{children}</div>
         {footer !== undefined ? (
-          <footer className="flex items-center justify-end gap-2 border-t border-zinc-100 px-6 py-4">
+          <footer className="flex items-center justify-end gap-2 border-t border-line-subtle px-6 py-4">
             {footer}
           </footer>
         ) : null}

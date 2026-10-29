@@ -58,7 +58,7 @@ export function ToastProvider({ children }: ToastProviderProps): JSX.Element {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="rounded-pill bg-zinc-900/95 px-4 py-2 text-xs font-medium text-white shadow-card"
+            className="rounded-pill bg-accent/95 px-4 py-2 text-xs font-medium text-accent-fg shadow-card"
           >
             {toast.message}
           </div>

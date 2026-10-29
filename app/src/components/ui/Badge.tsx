@@ -16,11 +16,14 @@ export interface BadgeProps {
 
 /** 各语义色的类名。 */
 const TONE_CLASS: Readonly<Record<BadgeTone, string>> = Object.freeze({
-  neutral: 'bg-zinc-100 text-zinc-600 ring-zinc-200',
-  info: 'bg-sky-50 text-sky-700 ring-sky-200',
-  warning: 'bg-amber-50 text-amber-700 ring-amber-200',
-  danger: 'bg-red-50 text-red-700 ring-red-200',
-  success: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  neutral: 'bg-surface-sunken text-fg-subtle ring-line',
+  // 彩色角标在深色主题下要压暗底、提亮字，否则一整块浅粉/浅绿会糊在深色卡片上。
+  info: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30',
+  warning:
+    'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30',
+  danger: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-500/15 dark:text-red-300 dark:ring-red-500/30',
+  success:
+    'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30',
 });
 
 /** 角标组件。 */

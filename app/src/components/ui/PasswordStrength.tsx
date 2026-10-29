@@ -31,9 +31,9 @@ function resolveLevel(score: number, acceptable: boolean): Level {
 
 /** 档位文案与配色。 */
 const LEVEL_META: Readonly<Record<Level, { label: string; bar: string; text: string }>> = Object.freeze({
-  weak: { label: '弱', bar: 'bg-red-500', text: 'text-red-600' },
-  medium: { label: '中', bar: 'bg-amber-500', text: 'text-amber-600' },
-  strong: { label: '强', bar: 'bg-emerald-500', text: 'text-emerald-600' },
+  weak: { label: '弱', bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' },
+  medium: { label: '中', bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' },
+  strong: { label: '强', bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
 });
 
 /** 强度条。 */
@@ -50,14 +50,14 @@ export function PasswordStrength({ password }: PasswordStrengthProps): JSX.Eleme
           {[0, 1, 2, 3].map((index) => (
             <span
               key={index}
-              className={`h-1 flex-1 rounded-full ${index < filled ? meta.bar : 'bg-zinc-200'}`}
+              className={`h-1 flex-1 rounded-full ${index < filled ? meta.bar : 'bg-surface-sunken'}`}
             />
           ))}
         </div>
         <span className={`text-[11px] font-medium ${meta.text}`}>强度：{meta.label}</span>
       </div>
       {password.length > 0 && strength.reasons.length > 0 ? (
-        <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-4 text-zinc-500">
+        <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] leading-4 text-fg-faint">
           {strength.reasons.map((reason) => (
             <li key={reason}>{t(reason, '请加强密码')}</li>
           ))}

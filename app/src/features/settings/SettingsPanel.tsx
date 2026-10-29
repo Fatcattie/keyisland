@@ -88,15 +88,15 @@ function ClipboardHistoryNotice(): JSX.Element {
   return (
     <div
       data-testid="clipboard-history-notice"
-      className="flex flex-col gap-1.5 rounded-card border border-amber-200 bg-amber-50 p-3"
+      className="flex flex-col gap-1.5 rounded-card border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 p-3"
     >
-      <h4 className="text-[11px] font-semibold text-amber-900">Windows 剪贴板历史风险</h4>
-      <p className="text-[11px] leading-5 text-amber-800">
+      <h4 className="text-[11px] font-semibold text-amber-900 dark:text-amber-200">Windows 剪贴板历史风险</h4>
+      <p className="text-[11px] leading-5 text-amber-800 dark:text-amber-200">
         自动清理只能清掉「当前」剪贴板项。只要系统开着剪贴板历史，Windows
-        会另行留存每次复制的记录，密岛清不到那里——别人按下 <kbd className="rounded border border-amber-300 bg-amber-100 px-1 text-[10px]">Win</kbd>+
-        <kbd className="rounded border border-amber-300 bg-amber-100 px-1 text-[10px]">V</kbd> 就能翻到你复制过的密码。
+        会另行留存每次复制的记录，密岛清不到那里——别人按下 <kbd className="rounded border border-amber-300 bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/15 px-1 text-[10px]">Win</kbd>+
+        <kbd className="rounded border border-amber-300 bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/15 px-1 text-[10px]">V</kbd> 就能翻到你复制过的密码。
       </p>
-      <p className="text-[11px] leading-5 text-amber-800">
+      <p className="text-[11px] leading-5 text-amber-800 dark:text-amber-200">
         建议关闭：设置 → 系统 → 剪贴板 → 关掉「剪贴板历史」，并在同一页点一次「清除」。
         如果你已经在这里复制过密码，请立刻去清一次历史。
       </p>
@@ -159,12 +159,12 @@ function DesktopOnlyToggle({
   return (
     <div className="flex flex-col gap-1" data-testid={id}>
       <div className="flex items-center gap-2">
-        <input id={id} type="checkbox" disabled className="h-4 w-4 rounded border-zinc-300" />
-        <label htmlFor={id} className="text-xs text-zinc-500">
+        <input id={id} type="checkbox" disabled className="h-4 w-4 rounded border-line-strong" />
+        <label htmlFor={id} className="text-xs text-fg-faint">
           {label}
         </label>
       </div>
-      <p className="pl-6 text-[11px] leading-4 text-zinc-500">{reason}</p>
+      <p className="pl-6 text-[11px] leading-4 text-fg-faint">{reason}</p>
     </div>
   );
 }
@@ -198,9 +198,9 @@ function ShortcutSection({
   busy: boolean;
 }): JSX.Element {
   return (
-    <section className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-zinc-50 p-4">
+    <section className="flex flex-col gap-2 rounded-card border border-line bg-surface-muted p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-zinc-900">快捷键</h3>
+        <h3 className="text-xs font-semibold text-fg">快捷键</h3>
         <Button variant="ghost" size="sm" disabled={busy} onClick={onReset}>
           恢复默认
         </Button>
@@ -217,10 +217,10 @@ function ShortcutSection({
             );
             return (
               <div key={id} className="flex items-center justify-between gap-3">
-                <span className="shrink-0 text-[11px] leading-5 text-zinc-600">{label}</span>
+                <span className="shrink-0 text-[11px] leading-5 text-fg-subtle">{label}</span>
                 <select
                   aria-label={`${label}快捷键`}
-                  className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-700"
+                  className="rounded border border-line-strong bg-surface px-1.5 py-0.5 font-mono text-[10px] text-fg-muted"
                   value={formatBinding(shortcuts[id])}
                   onChange={(event) => onChange(id, event.target.value)}
                 >
@@ -235,12 +235,12 @@ function ShortcutSection({
           }
           return (
             <div key={id} className="flex items-center justify-between gap-3">
-              <span className="shrink-0 text-[11px] leading-5 text-zinc-600">{label}</span>
+              <span className="shrink-0 text-[11px] leading-5 text-fg-subtle">{label}</span>
               <span className="flex items-center gap-2">
-                <kbd className="rounded border border-zinc-300 bg-white px-1.5 py-0.5 font-mono text-[10px] text-zinc-700">
+                <kbd className="rounded border border-line-strong bg-surface px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
                   {formatBinding(shortcuts[id])}
                 </kbd>
-                <span className="text-[10px] text-zinc-400" title={FIXED_SHORTCUTS[id].reason}>
+                <span className="text-[10px] text-fg-faint" title={FIXED_SHORTCUTS[id].reason}>
                   固定
                 </span>
               </span>
@@ -248,7 +248,7 @@ function ShortcutSection({
           );
         })}
       </div>
-      <p className="text-[11px] leading-4 text-zinc-500">
+      <p className="text-[11px] leading-4 text-fg-faint">
         标为「固定」的三项是列表导航与关闭浮层的通用约定（WAI-ARIA
         APG），更换会让读屏用户失去预期，因此不开放自定义。全局热键（唤出灵动岛 / 立即锁定）
         与系统级自定义绑定需要桌面版：Web 阶段没有注册系统级热键的能力，给了开关也按不动。
@@ -262,12 +262,12 @@ function BackupStatusRow({ status }: { status: BackupStatus | null }): JSX.Eleme
   const age = describeBackupAge(status);
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="backup-status">
-      <span className="text-[11px] font-medium text-zinc-700">上次备份</span>
-      <span className={age.overdue ? 'text-[11px] font-medium text-amber-700' : 'text-[11px] text-zinc-600'}>
+      <span className="text-[11px] font-medium text-fg-muted">上次备份</span>
+      <span className={age.overdue ? 'text-[11px] font-medium text-amber-700 dark:text-amber-300' : 'text-[11px] text-fg-subtle'}>
         {age.text}
       </span>
       {age.overdue ? (
-        <span className="text-[11px] text-amber-700">
+        <span className="text-[11px] text-amber-700 dark:text-amber-300">
           · 已超过 {BACKUP_REMINDER_DAYS} 天，建议现在导出一份
         </span>
       ) : null}
@@ -343,8 +343,8 @@ function HotzoneSection({
   const widthPercent = (band.width / HOTZONE_PREVIEW_VIEWPORT_PX) * 100;
 
   return (
-    <section className="flex flex-col gap-3 rounded-card border border-zinc-200 bg-zinc-50 p-4">
-      <h3 className="text-xs font-semibold text-zinc-900">灵动岛</h3>
+    <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-muted p-4">
+      <h3 className="text-xs font-semibold text-fg">灵动岛</h3>
       <Field
         label="收起延时"
         htmlFor="settings-collapse-delay"
@@ -403,7 +403,7 @@ function HotzoneSection({
               }
             }}
           />
-          <span className="text-xs text-zinc-500">px</span>
+          <span className="text-xs text-fg-faint">px</span>
         </div>
       </Field>
       <Field
@@ -419,8 +419,8 @@ function HotzoneSection({
               onClick={() => onChange({ align: option.value })}
               className={
                 config.align === option.value
-                  ? 'rounded-pill bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white'
-                  : 'rounded-pill border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-zinc-300'
+                  ? 'rounded-pill bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg'
+                  : 'rounded-pill border border-line bg-surface px-3 py-1.5 text-xs font-medium text-fg-muted hover:border-line-strong'
               }
             >
               {option.label}
@@ -429,10 +429,10 @@ function HotzoneSection({
         </div>
       </Field>
       <div className="flex flex-col gap-1">
-        <span className="text-[11px] font-medium text-zinc-700">覆盖范围（按 1440px 宽屏折算）</span>
-        <div className="relative h-2 w-full rounded-full bg-zinc-200" data-testid="hotzone-preview">
+        <span className="text-[11px] font-medium text-fg-muted">覆盖范围（按 1440px 宽屏折算）</span>
+        <div className="relative h-2 w-full rounded-full bg-surface-sunken" data-testid="hotzone-preview">
           <div
-            className="absolute top-0 h-2 rounded-full bg-zinc-900"
+            className="absolute top-0 h-2 rounded-full bg-accent"
             style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
           />
         </div>
@@ -440,7 +440,7 @@ function HotzoneSection({
       {/* PRD FR-02 验收要点「全屏应用前台时鼠标划过顶部不弹出」。
           Web 阶段只能看到浏览器自己的全屏，这一点必须写清楚，不能靠
           "实现了全屏检测"让用户以为已经覆盖所有场景。 */}
-      <p className="text-[11px] leading-5 text-zinc-500">
+      <p className="text-[11px] leading-5 text-fg-faint">
         全屏时自动抑制唤起：浏览器全屏（F11 或页面全屏）下，鼠标划过顶部不会弹出灵动岛。
         系统里另开的全屏游戏 / 播放器、以及多显示器的主屏归属，都在浏览器进程之外，Web 版看不到，那几条路径要等桌面版接入。
       </p>
@@ -1017,7 +1017,7 @@ export function SettingsPanel({
     >
       <div className="flex flex-col gap-6">
         <section className="flex flex-col gap-3">
-          <h3 className="text-xs font-semibold text-zinc-900">安全</h3>
+          <h3 className="text-xs font-semibold text-fg">安全</h3>
           <Field label="自动锁定" htmlFor="settings-policy" hint="切换后立即生效，并对已解锁会话重新计时">
             <select
               id="settings-policy"
@@ -1064,11 +1064,11 @@ export function SettingsPanel({
                 id="settings-lock-on-system-lock"
                 type="checkbox"
                 role="switch"
-                className="h-4 w-4 rounded border-zinc-300 accent-zinc-900"
+                className="h-4 w-4 rounded border-line-strong accent-accent"
                 checked={snapshot.lockOnSystemLock}
                 onChange={(event) => void handleLockOnSystemLock(event.target.checked)}
               />
-              <span className="text-xs text-zinc-600" data-testid="lock-on-system-lock-state">
+              <span className="text-xs text-fg-subtle" data-testid="lock-on-system-lock-state">
                 {snapshot.lockOnSystemLock ? '已开启' : '已关闭'}
               </span>
             </div>
@@ -1102,11 +1102,11 @@ export function SettingsPanel({
           />
           {/* PRD FR-08.1：解锁态下可轮换恢复密钥（怀疑泄露时用）。
               放在「安全」区而不是「数据管理」区：它换的是一把钥匙，不是一份数据。 */}
-          <div className="flex flex-col gap-1.5 border-t border-zinc-100 pt-3">
+          <div className="flex flex-col gap-1.5 border-t border-line-subtle pt-3">
             <Button variant="secondary" onClick={() => setRotateOpen(true)}>
               重新生成恢复密钥
             </Button>
-            <p className="text-[11px] leading-4 text-zinc-500">
+            <p className="text-[11px] leading-4 text-fg-faint">
               怀疑恢复码泄露时换一把新的。需要输入主密码，生成后旧恢复码立即失效，主密码不受影响。
             </p>
           </div>
@@ -1132,9 +1132,9 @@ export function SettingsPanel({
 
         <AuditLogPanel entries={auditEntries} onClear={() => void handleClearAudit()} />
 
-        <section className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-zinc-50 p-4">
-          <h3 className="text-xs font-semibold text-zinc-900">数据说明</h3>
-          <p className="text-[11px] leading-5 text-zinc-600">
+        <section className="flex flex-col gap-2 rounded-card border border-line bg-surface-muted p-4">
+          <h3 className="text-xs font-semibold text-fg">数据说明</h3>
+          <p className="text-[11px] leading-5 text-fg-subtle">
             当前版本使用内存存储：刷新或关闭页面即清空全部数据，不会写入磁盘。
             Tauri + SQLCipher 接入后才会持久化（见 ADR-010）。
           </p>
@@ -1142,8 +1142,8 @@ export function SettingsPanel({
               内存存储没有文件路径，也不假装有——路径显示为"未落盘"，
               按钮禁用并说明原因；SQLCipher 落库后同一处自动显示真实路径。 */}
           <div className="flex flex-wrap items-center gap-2" data-testid="storage-location">
-            <span className="text-[11px] font-medium text-zinc-700">数据文件</span>
-            <code className="rounded bg-white px-2 py-1 text-[11px] text-zinc-600 ring-1 ring-zinc-200">
+            <span className="text-[11px] font-medium text-fg-muted">数据文件</span>
+            <code className="rounded bg-surface px-2 py-1 text-[11px] text-fg-subtle ring-1 ring-line">
               {storageLocation?.displayPath ?? '内存存储（未落盘）'}
             </code>
             <Button
@@ -1184,9 +1184,9 @@ export function SettingsPanel({
           ) : null}
         </section>
 
-        <section className="flex flex-col gap-3 rounded-card border border-zinc-200 bg-zinc-50 p-4">
-          <h3 className="text-xs font-semibold text-zinc-900">密码体检</h3>
-          <p className="text-[11px] leading-5 text-zinc-600">
+        <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-muted p-4">
+          <h3 className="text-xs font-semibold text-fg">密码体检</h3>
+          <p className="text-[11px] leading-5 text-fg-subtle">
             检查重复密码、弱密码与长期未修改的卡片。体检只读取密码摘要，不会显示任何密码明文。
           </p>
           <div className="flex flex-wrap gap-2">
@@ -1201,16 +1201,16 @@ export function SettingsPanel({
           </div>
 
           {health !== null ? (
-            <div className="flex flex-col gap-3 rounded-card border border-zinc-200 bg-white p-3 text-[11px] text-zinc-600">
+            <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 text-[11px] text-fg-subtle">
               <p>共检查 {health.totalItems} 张卡片。</p>
 
               {isHealthy(health) ? (
-                <p className="text-emerald-700">全部健康：没有重复密码、弱密码或过期密码。</p>
+                <p className="text-emerald-700 dark:text-emerald-300">全部健康：没有重复密码、弱密码或过期密码。</p>
               ) : null}
 
               {health.duplicates.map((group) => (
                 <div key={group.digest} className="flex flex-col gap-1">
-                  <p className="font-semibold text-zinc-900">{group.itemIds.length} 张卡片使用同一个密码</p>
+                  <p className="font-semibold text-fg">{group.itemIds.length} 张卡片使用同一个密码</p>
                   <ul className="list-disc pl-4">
                     {group.titles.map((title, index) => (
                       <li key={group.itemIds[index]}>{title}</li>
@@ -1221,12 +1221,12 @@ export function SettingsPanel({
 
               {health.weak.length > 0 ? (
                 <div className="flex flex-col gap-1">
-                  <p className="font-semibold text-zinc-900">弱密码（{health.weak.length}）</p>
+                  <p className="font-semibold text-fg">弱密码（{health.weak.length}）</p>
                   <ul className="list-disc pl-4">
                     {health.weak.map((finding) => (
                       <li key={finding.itemId}>
                         {finding.title}
-                        <span className="text-zinc-500"> · {finding.detail}</span>
+                        <span className="text-fg-faint"> · {finding.detail}</span>
                         {onLocateItem !== undefined ? (
                           <Button
                             variant="ghost"
@@ -1245,12 +1245,12 @@ export function SettingsPanel({
 
               {health.stale.length > 0 ? (
                 <div className="flex flex-col gap-1">
-                  <p className="font-semibold text-zinc-900">长期未修改（{health.stale.length}）</p>
+                  <p className="font-semibold text-fg">长期未修改（{health.stale.length}）</p>
                   <ul className="list-disc pl-4">
                     {health.stale.map((finding) => (
                       <li key={finding.itemId}>
                         {finding.title}
-                        <span className="text-zinc-500"> · {finding.detail}</span>
+                        <span className="text-fg-faint"> · {finding.detail}</span>
                         {onLocateItem !== undefined ? (
                           <Button
                             variant="ghost"
@@ -1267,14 +1267,14 @@ export function SettingsPanel({
                 </div>
               ) : null}
 
-              <p className="text-zinc-500">修改密码请在主面板打开对应卡片后编辑。</p>
+              <p className="text-fg-faint">修改密码请在主面板打开对应卡片后编辑。</p>
             </div>
           ) : null}
         </section>
 
-        <section className="flex flex-col gap-3 rounded-card border border-zinc-200 bg-zinc-50 p-4">
-          <h3 className="text-xs font-semibold text-zinc-900">从 CSV 迁移</h3>
-          <p className="text-[11px] leading-5 text-zinc-600">
+        <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-muted p-4">
+          <h3 className="text-xs font-semibold text-fg">从 CSV 迁移</h3>
+          <p className="text-[11px] leading-5 text-fg-subtle">
             从浏览器或其它密码管理器导出的 CSV 通常是明文的，导入后请尽快删除源文件。
             预览只显示标题与账号，不会显示密码。
           </p>
@@ -1285,7 +1285,7 @@ export function SettingsPanel({
           </div>
 
           {csvOpen ? (
-            <div className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-white p-3">
+            <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-3">
               <Field label="CSV 文件" htmlFor="settings-csv-file" hint="需要包含「名称 / 账号 / 密码」三列，兼容常见英文与中文表头">
                 <input
                   id="settings-csv-file"
@@ -1302,15 +1302,15 @@ export function SettingsPanel({
               </Field>
 
               {csvError !== null ? (
-                <p role="alert" className="text-[11px] text-red-600">
+                <p role="alert" className="text-[11px] text-red-600 dark:text-red-400">
                   {csvError}
                 </p>
               ) : null}
 
               {csvPreview !== null ? (
-                <div className="rounded-card border border-zinc-200 bg-zinc-50 p-3 text-[11px] text-zinc-600">
+                <div className="rounded-card border border-line bg-surface-muted p-3 text-[11px] text-fg-subtle">
                   <p>
-                    可导入 <span className="font-semibold text-zinc-900">{csvPreview.items.length}</span> 张卡片
+                    可导入 <span className="font-semibold text-fg">{csvPreview.items.length}</span> 张卡片
                     {csvPreview.skipped.length > 0 ? ` · 跳过 ${csvPreview.skipped.length} 行` : ''}
                   </p>
                   {csvPreview.skipped.length > 0 ? (
@@ -1325,7 +1325,7 @@ export function SettingsPanel({
                   {csvPreview.skipped.length > 5 ? (
                     <p className="mt-1">其余 {csvPreview.skipped.length - 5} 行同样被跳过。</p>
                   ) : null}
-                  <p className="mt-1 text-zinc-500">已读取文件内容：{csvText.length} 个字符</p>
+                  <p className="mt-1 text-fg-faint">已读取文件内容：{csvText.length} 个字符</p>
                 </div>
               ) : null}
 
@@ -1344,9 +1344,9 @@ export function SettingsPanel({
           ) : null}
         </section>
 
-        <section className="flex flex-col gap-3 rounded-card border border-zinc-200 bg-zinc-50 p-4">
-          <h3 className="text-xs font-semibold text-zinc-900">备份与恢复</h3>
-          <p className="text-[11px] leading-5 text-zinc-600">
+        <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-muted p-4">
+          <h3 className="text-xs font-semibold text-fg">备份与恢复</h3>
+          <p className="text-[11px] leading-5 text-fg-subtle">
             备份文件用备份密码单独加密，需要解锁状态才能导出；导入必须提供同一个备份密码。
           </p>
 
@@ -1360,7 +1360,7 @@ export function SettingsPanel({
           </div>
 
           {backupOpen ? (
-            <div className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-white p-3">
+            <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-3">
               <Field
                 label="备份密码"
                 htmlFor="settings-backup-password"
@@ -1384,7 +1384,7 @@ export function SettingsPanel({
           ) : null}
 
           {importOpen ? (
-            <div className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-white p-3">
+            <div className="flex flex-col gap-2 rounded-card border border-line bg-surface p-3">
               <Field label="备份文件" htmlFor="settings-backup-file" hint="选择 .kib 文件，或直接在下方粘贴内容">
                 <input
                   id="settings-backup-file"
@@ -1470,22 +1470,22 @@ export function SettingsPanel({
           ) : null}
         </section>
 
-        <section className="flex flex-col gap-2 rounded-card border border-red-200 bg-red-50 p-4">
-          <h3 className="text-xs font-semibold text-red-800">销毁全部数据</h3>
-          <p className="text-[11px] leading-5 text-red-700">
+        <section className="flex flex-col gap-2 rounded-card border border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 p-4">
+          <h3 className="text-xs font-semibold text-red-800 dark:text-red-200">销毁全部数据</h3>
+          <p className="text-[11px] leading-5 text-red-700 dark:text-red-300">
             这是唯一的数据销毁途径，删除后无法恢复。请输入主密码并输入「销毁」以确认。
           </p>
           <input
             aria-label="销毁数据主密码"
             type="password"
             autoComplete="current-password"
-            className={`${INPUT_CLASS} border-red-200`}
+            className={`${INPUT_CLASS} border-red-200 dark:border-red-500/40`}
             value={destroyPassword}
             onChange={(event) => setDestroyPassword(event.target.value)}
           />
           <input
             aria-label="确认销毁"
-            className={`${INPUT_CLASS} border-red-200`}
+            className={`${INPUT_CLASS} border-red-200 dark:border-red-500/40`}
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}
             placeholder="销毁"

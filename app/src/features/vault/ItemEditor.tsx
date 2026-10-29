@@ -282,7 +282,7 @@ export function ItemEditor({ open, item, onClose, onSaved }: ItemEditorProps): J
                 type="button"
                 aria-label="粘贴账号"
                 onClick={() => void handlePaste('username')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-zinc-200 bg-white text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-line bg-surface text-fg-faint transition-colors hover:bg-surface-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
               >
                 <ClipboardPaste aria-hidden="true" size={14} />
               </button>
@@ -308,7 +308,7 @@ export function ItemEditor({ open, item, onClose, onSaved }: ItemEditorProps): J
                 type="button"
                 aria-label="粘贴密码"
                 onClick={() => void handlePaste('password')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-zinc-200 bg-white text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-line bg-surface text-fg-faint transition-colors hover:bg-surface-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
               >
                 <ClipboardPaste aria-hidden="true" size={14} />
               </button>
@@ -317,7 +317,7 @@ export function ItemEditor({ open, item, onClose, onSaved }: ItemEditorProps): J
                 aria-label={passwordVisible ? '隐藏密码' : '显示密码'}
                 aria-pressed={passwordVisible}
                 onClick={() => setPasswordVisible((previous) => !previous)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-zinc-200 bg-white text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-line bg-surface text-fg-faint transition-colors hover:bg-surface-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
               >
                 {passwordVisible ? (
                   <EyeOff aria-hidden="true" size={14} />
@@ -331,10 +331,10 @@ export function ItemEditor({ open, item, onClose, onSaved }: ItemEditorProps): J
 
         <section
           aria-label="密码生成器"
-          className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-zinc-50 p-3"
+          className="flex flex-col gap-2 rounded-card border border-line bg-surface-muted p-3"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium text-zinc-600">生成强密码</span>
+            <span className="text-[11px] font-medium text-fg-subtle">生成强密码</span>
             {LENGTH_PRESETS.map((preset) => (
               <button
                 key={preset}
@@ -343,8 +343,8 @@ export function ItemEditor({ open, item, onClose, onSaved }: ItemEditorProps): J
                 onClick={() => setLength(preset)}
                 className={`rounded-pill px-2.5 py-1 text-[11px] font-medium transition-colors ${
                   length === preset
-                    ? 'bg-zinc-900 text-white'
-                    : 'bg-white text-zinc-600 ring-1 ring-inset ring-zinc-200'
+                    ? 'bg-accent text-accent-fg'
+                    : 'bg-surface text-fg-subtle ring-1 ring-inset ring-line'
                 }`}
               >
                 {preset} 位
@@ -356,7 +356,7 @@ export function ItemEditor({ open, item, onClose, onSaved }: ItemEditorProps): J
               生成
             </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-600">
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-fg-subtle">
             <label className="flex items-center gap-1.5">
               <input type="checkbox" checked={useLower} onChange={(event) => setUseLower(event.target.checked)} />
               小写

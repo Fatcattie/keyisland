@@ -167,7 +167,7 @@ export function HiddenAccessDialog({
             />
           </Field>
           {error !== null ? (
-            <div role="alert" className="text-xs font-medium text-red-600">
+            <div role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
               <p>{error}</p>
               {attemptsLeft !== null ? (
                 <p className="mt-1 font-normal text-red-500">还可尝试 {attemptsLeft} 次</p>
@@ -180,10 +180,10 @@ export function HiddenAccessDialog({
         </form>
       ) : (
         <div className="flex flex-col gap-2">
-          <p role="status" className="rounded-pill bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+          <p role="status" className="rounded-pill bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
             授权剩余 {formatCountdown(remaining)}
           </p>
-          <p className="text-[11px] leading-5 text-zinc-500">
+          <p className="text-[11px] leading-5 text-fg-faint">
             {purpose === 'reveal'
               ? '已临时解除遮罩，到期后会自动恢复隐藏。'
               : '隐藏列表已展示在主面板中，到期后会自动退出并清除授权。'}

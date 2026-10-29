@@ -14,7 +14,7 @@
  *   这里必须靠 `autoFocus` + `document.activeElement` 才能拿到键盘事件。
  */
 
-import { useCallback, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type WheelEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type WheelEvent } from 'react';
 import { motion, type Transition } from 'framer-motion';
 import { Command, KeyRound, Lock, Plus, RefreshCw, Search } from 'lucide-react';
 import { useVaultClient } from '../../app/VaultProvider';
@@ -999,9 +999,31 @@ export function Island({ status, onLock, onRequestUnlock, onOpenSettings }: Isla
     [activeIndex, pickerOpen, setActiveIndex, unlocked, visible.length],
   );
 
+  /**
+   * 中键（按下滚轮）退出滑动选择器。
+   *
+   * 进选择器靠滚轮，出来却只有 Esc 和那个不起眼的「关闭」——用户的第一反应是
+   * "再按一下滚轮"。所以把中键接成"退出选择"。
+   *
+   * 必须拦在 `mousedown` 而不是 `auxclick`：Windows 的 WebView2 把中键按下解释成
+   * "自动滚动"，`auxclick` 触发时页面已经开始滚了，`preventDefault` 也按不住。
+   * 只在选择器开着时拦，其余场景保持浏览器默认行为。
+   */
+  const handleSurfaceMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLElement>): void => {
+      if (event.button !== 1 || !pickerOpen) {
+        return;
+      }
+      event.preventDefault();
+      setPickerOpen(false);
+    },
+    [pickerOpen],
+  );
+
   /** 重新拉取最近使用（新建卡片后刷新列表）。 */
   const refreshRecent = async (): Promise<void> => {
     try {
+
       setItems(await client.getIslandItems());
     } catch (caught) {
       // 刷新失败不影响刚创建的卡片，只提示，不打断闭环。
@@ -1321,6 +1343,7 @@ export function Island({ status, onLock, onRequestUnlock, onOpenSettings }: Isla
               data-testid="island-panel"
               onKeyDown={handleKeyDown}
               onBlur={handleSurfaceBlur}
+              onMouseDown={handleSurfaceMouseDown}
               onPointerEnter={handlePanelPointerEnter}
               onPointerLeave={handlePanelPointerLeave}
               onWheel={handleWheel}

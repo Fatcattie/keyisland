@@ -232,8 +232,8 @@ export function SessionGate(): JSX.Element {
 
   if (!booted) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-zinc-100">
-        <p role="status" className="text-xs text-zinc-500">
+      <div className="flex min-h-full items-center justify-center bg-page">
+        <p role="status" className="text-xs text-fg-faint">
           正在准备本地保险库…
         </p>
       </div>
@@ -242,15 +242,15 @@ export function SessionGate(): JSX.Element {
 
   if (bootError !== null) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-zinc-100 px-4">
-        <div className="w-full max-w-md rounded-card border border-red-200 bg-white p-6 text-center shadow-card">
-          <p role="alert" className="text-sm font-semibold text-red-700">
+      <div className="flex min-h-full items-center justify-center bg-page px-4">
+        <div className="w-full max-w-md rounded-card border border-red-200 bg-surface p-6 text-center shadow-card">
+          <p role="alert" className="text-sm font-semibold text-red-700 dark:text-red-300">
             {bootError}
           </p>
           <button
             type="button"
             onClick={() => void refresh()}
-            className="mt-4 rounded-pill bg-zinc-900 px-4 py-2 text-xs font-medium text-white"
+            className="mt-4 rounded-pill bg-accent px-4 py-2 text-xs font-medium text-accent-fg"
           >
             重试
           </button>
@@ -261,8 +261,8 @@ export function SessionGate(): JSX.Element {
 
   if (snapshot === null) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-zinc-100">
-        <p role="status" className="text-xs text-zinc-500">
+      <div className="flex min-h-full items-center justify-center bg-page">
+        <p role="status" className="text-xs text-fg-faint">
           正在准备本地保险库…
         </p>
       </div>

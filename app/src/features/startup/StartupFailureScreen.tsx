@@ -102,17 +102,17 @@ export function StartupFailureScreen({ failure }: StartupFailureScreenProps): JS
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-zinc-100 px-4 py-10">
-      <div className="w-full max-w-lg rounded-card border border-red-200 bg-white p-6 shadow-card">
+    <div className="flex min-h-full items-center justify-center bg-page px-4 py-10">
+      <div className="w-full max-w-lg rounded-card border border-red-200 bg-surface p-6 shadow-card">
         <p className="text-[11px] font-medium tracking-wide text-red-600">启动失败</p>
-        <h1 role="alert" className="mt-1 text-base font-semibold text-zinc-900">
+        <h1 role="alert" className="mt-1 text-base font-semibold text-fg">
           {copy.title}
         </h1>
-        <p className="mt-3 text-xs leading-relaxed text-zinc-600">{copy.lead}</p>
+        <p className="mt-3 text-xs leading-relaxed text-fg-subtle">{copy.lead}</p>
 
         <ul className="mt-3 space-y-1.5">
           {copy.steps.map((step) => (
-            <li key={step} className="flex gap-2 text-xs leading-relaxed text-zinc-700">
+            <li key={step} className="flex gap-2 text-xs leading-relaxed text-fg-muted">
               <span
                 aria-hidden="true"
                 className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-zinc-400"
@@ -124,15 +124,15 @@ export function StartupFailureScreen({ failure }: StartupFailureScreenProps): JS
 
         {failure.detail.length > 0 ? (
           <div className="mt-4">
-            <p className="text-[11px] font-medium text-zinc-700">具体原因</p>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-zinc-50 p-3 text-[11px] leading-relaxed text-zinc-600 ring-1 ring-zinc-200">
+            <p className="text-[11px] font-medium text-fg-muted">具体原因</p>
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface-muted p-3 text-[11px] leading-relaxed text-fg-subtle ring-1 ring-line">
               {failure.detail}
             </pre>
           </div>
         ) : null}
 
         {failure.dbPath !== null ? (
-          <p className="mt-3 text-[11px] text-zinc-500">
+          <p className="mt-3 text-[11px] text-fg-faint">
             数据文件：<code className="break-all">{failure.dbPath}</code>
           </p>
         ) : null}

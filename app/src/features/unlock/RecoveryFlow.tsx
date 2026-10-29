@@ -144,22 +144,22 @@ export function RecoveryFlow({ onCancel, onDone }: RecoveryFlowProps): JSX.Eleme
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-zinc-100 px-4 py-12">
-      <main className="w-full max-w-lg rounded-card border border-zinc-200 bg-white p-8 shadow-card">
+    <div className="flex min-h-full items-center justify-center bg-page px-4 py-12">
+      <main className="w-full max-w-lg rounded-card border border-line bg-surface p-8 shadow-card">
         <header className="mb-5">
-          <h1 className="text-lg font-semibold text-zinc-900">
+          <h1 className="text-lg font-semibold text-fg">
             {stage === 'verify' ? '用恢复凭据验证身份' : '设置新的主密码'}
           </h1>
-          <p className="mt-1 text-xs leading-5 text-zinc-500">
+          <p className="mt-1 text-xs leading-5 text-fg-faint">
             {stage === 'verify'
               ? '输入 32 位恢复码（大小写与分隔符不敏感），或直接粘贴 .kirk 文件内容。'
               : '新主密码只重写密码槽，恢复码继续有效。'}
           </p>
         </header>
 
-        <div className="mb-5 flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2.5">
-          <ShieldAlert aria-hidden="true" size={14} className="mt-0.5 text-amber-700" />
-          <p className="text-[11px] leading-5 text-amber-700">
+        <div className="mb-5 flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 px-3 py-2.5">
+          <ShieldAlert aria-hidden="true" size={14} className="mt-0.5 text-amber-700 dark:text-amber-300" />
+          <p className="text-[11px] leading-5 text-amber-700 dark:text-amber-300">
             主密码与恢复密钥同时丢失，数据将永久不可恢复 —— 密岛没有服务器，也没有后门。
           </p>
         </div>
@@ -182,7 +182,7 @@ export function RecoveryFlow({ onCancel, onDone }: RecoveryFlowProps): JSX.Eleme
               />
             </Field>
             {fileName !== null ? (
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-fg-faint">
                 已载入文件：{fileName}（{credential.length} 个字符）
               </p>
             ) : null}
@@ -205,7 +205,7 @@ export function RecoveryFlow({ onCancel, onDone }: RecoveryFlowProps): JSX.Eleme
               />
             </Field>
             {error !== null ? (
-              <p role="alert" className="text-xs font-medium text-red-600">
+              <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
                 {error}
               </p>
             ) : null}
@@ -248,7 +248,7 @@ export function RecoveryFlow({ onCancel, onDone }: RecoveryFlowProps): JSX.Eleme
               />
             </Field>
             {error !== null ? (
-              <p role="alert" className="text-xs font-medium text-red-600">
+              <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
                 {error}
               </p>
             ) : null}

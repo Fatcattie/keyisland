@@ -89,6 +89,32 @@ describe('灵动岛 · 滚轮滑动线选择器', () => {
     });
   });
 
+  it('中键（按下滚轮）退出滑动线、回到面板', async () => {
+    const harness = await setupWithItems();
+    const panel = await expand(harness);
+
+    fireEvent.wheel(panel, { deltaY: 100 });
+    await screen.findByTestId('island-scroll-picker');
+
+    fireEvent.mouseDown(panel, { button: 1 });
+    await waitFor(() => {
+      expect(screen.queryByTestId('island-scroll-picker')).toBeNull();
+    });
+    // 岛面板还在，且没有连带收起。
+    expect(screen.getByTestId('island-panel')).toBeInTheDocument();
+  });
+
+  it('左键不会误关滑动线（只有中键生效）', async () => {
+    const harness = await setupWithItems();
+    const panel = await expand(harness);
+
+    fireEvent.wheel(panel, { deltaY: 100 });
+    await screen.findByTestId('island-scroll-picker');
+
+    fireEvent.mouseDown(panel, { button: 0 });
+    expect(screen.getByTestId('island-scroll-picker')).toBeInTheDocument();
+  });
+
   it('Esc 只关滑动线、不收起整个岛', async () => {
     const harness = await setupWithItems();
     const panel = await expand(harness);

@@ -101,18 +101,18 @@ export function RotateRecoveryKeyDialog({ open, onClose }: RotateRecoveryKeyDial
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="rounded-card border border-amber-200 bg-amber-50 p-3">
-            <p className="flex items-start gap-2 text-[11px] leading-5 text-amber-800">
+          <div className="rounded-card border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 p-3">
+            <p className="flex items-start gap-2 text-[11px] leading-5 text-amber-800 dark:text-amber-200">
               <ShieldAlert aria-hidden="true" size={14} className="mt-0.5 shrink-0" />
               恢复码等价于备用钥匙：任何拿到它的人都能重设你的主密码。请抄写到纸上或存进离线位置，
               不要放在这台电脑上。
             </p>
           </div>
           <div>
-            <p className="mb-1.5 text-xs font-medium text-zinc-700">你的新恢复码</p>
+            <p className="mb-1.5 text-xs font-medium text-fg-muted">你的新恢复码</p>
             <code
               data-testid="rotated-recovery-code"
-              className="block select-all break-all rounded-card bg-zinc-900 px-3 py-2.5 font-mono text-[11px] leading-5 text-zinc-50"
+              className="block select-all break-all rounded-card bg-accent px-3 py-2.5 font-mono text-[11px] leading-5 text-accent-fg"
             >
               {result.recoveryCode}
             </code>
@@ -125,7 +125,7 @@ export function RotateRecoveryKeyDialog({ open, onClose }: RotateRecoveryKeyDial
               </Button>
             </div>
           </div>
-          <label className="flex items-start gap-2 text-[11px] leading-5 text-zinc-600">
+          <label className="flex items-start gap-2 text-[11px] leading-5 text-fg-subtle">
             <input
               type="checkbox"
               className="mt-0.5 h-3.5 w-3.5"
@@ -157,8 +157,8 @@ export function RotateRecoveryKeyDialog({ open, onClose }: RotateRecoveryKeyDial
         className="flex flex-col gap-4"
         noValidate
       >
-        <div className="rounded-card border border-red-200 bg-red-50 p-3">
-          <p className="text-[11px] leading-5 text-red-700">
+        <div className="rounded-card border border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 p-3">
+          <p className="text-[11px] leading-5 text-red-700 dark:text-red-300">
             生成新恢复码后，<strong>旧恢复码与旧 .kirk 文件立即失效</strong>
             ，没有过渡期。请确认新恢复码已经妥善保存后再关闭这个窗口。
           </p>
@@ -177,7 +177,7 @@ export function RotateRecoveryKeyDialog({ open, onClose }: RotateRecoveryKeyDial
           />
         </Field>
         {error !== null ? (
-          <p role="alert" className="text-xs font-medium text-red-600">
+          <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
             {error}
           </p>
         ) : null}

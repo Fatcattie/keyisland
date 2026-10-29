@@ -119,7 +119,7 @@ function StrengthDots({ level }: { level: StrengthLevel }): JSX.Element {
       {[0, 1, 2].map((index) => (
         <span
           key={index}
-          className={`h-1.5 w-1.5 rounded-full ${index < meta.filled ? meta.color : 'bg-zinc-200'}`}
+          className={`h-1.5 w-1.5 rounded-full ${index < meta.filled ? meta.color : 'bg-surface-sunken'}`}
         />
       ))}
     </span>
@@ -156,7 +156,11 @@ export function ItemCard({
   const rotateY = useSpring(useTransform(pointerX, [0, 1], [-12, 12]), SPRING);
   const glowX = useTransform(pointerX, (value) => `${Math.round(value * 100)}%`);
   const glowY = useTransform(pointerY, (value) => `${Math.round(value * 100)}%`);
-  const glow = useMotionTemplate`radial-gradient(circle at ${glowX} ${glowY}, rgba(255,255,255,0.9), transparent 55%)`;
+  /**
+   * 光晕强度走 CSS 变量（`--ki-glow-a`）：亮色下卡片是白的，白色光晕几乎不可见；
+   * 深色下同一束白光会糊成一大块白斑，只能靠变量把它压下去。
+   */
+  const glow = useMotionTemplate`radial-gradient(circle at ${glowX} ${glowY}, rgb(255 255 255 / var(--ki-glow-a)), transparent 55%)`;
 
   // —— 按住预览：明文只在本地 state ——
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -382,8 +386,8 @@ export function ItemCard({
           endReveal();
         }}
         onBlur={endReveal}
-        className={`relative rounded-card border bg-white shadow-card ${
-          selectMode && selected ? 'border-zinc-900 ring-2 ring-zinc-900' : 'border-zinc-200'
+        className={`group relative rounded-card border bg-surface shadow-card ${
+          selectMode && selected ? 'border-accent ring-2 ring-accent' : 'border-line'
         } ${selectMode ? 'cursor-pointer' : ''}`}
       >
         {/*
@@ -391,11 +395,21 @@ export function ItemCard({
           * 卡片本身**不能** overflow-hidden：那会强制 `transform-style` 扁平化，
           * 把内层 `translateZ(28px)` 的深度整个吃掉（看起来就是一张平的卡片）。
           */}
+        {/*
+         * 光晕只在指针悬停时出现。
+         *
+         * 原来是无条件铺在卡片上：亮色下卡片本身就是白的，白光晕看不见，谁也没发现；
+         * 深色下同一束光会变成卡片中央一块洗不掉的灰白雾。改成 hover 才显影，
+         * 亮色视觉零变化，深色干净。
+         */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden rounded-card"
         >
-          <motion.span className="absolute inset-0 opacity-70" style={{ backgroundImage: glow }} />
+          <motion.span
+            className="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-70"
+            style={{ backgroundImage: glow }}
+          />
         </div>
 
         <div
@@ -414,7 +428,7 @@ export function ItemCard({
                 readOnly
                 tabIndex={-1}
                 aria-hidden="true"
-                className="mt-1 h-4 w-4 shrink-0 accent-zinc-900"
+                className="mt-1 h-4 w-4 shrink-0 accent-accent"
               />
             ) : null}
             <span
@@ -425,10 +439,10 @@ export function ItemCard({
               {avatarInitial(item.title)}
             </span>
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-sm font-semibold text-zinc-900" title={item.title}>
+              <h3 className="truncate text-sm font-semibold text-fg" title={item.title}>
                 {item.title}
               </h3>
-              <p className="truncate text-[11px] text-zinc-500">
+              <p className="truncate text-[11px] text-fg-faint">
                 {item.platform ?? '未填写平台'}
               </p>
             </div>
@@ -438,8 +452,8 @@ export function ItemCard({
                 aria-label={item.favorite ? '取消收藏' : '收藏'}
                 aria-pressed={item.favorite}
                 onClick={() => void handleFavorite()}
-                className={`rounded-full p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20 ${
-                  item.favorite ? 'text-amber-500' : 'text-zinc-300 hover:text-zinc-500'
+                className={`rounded-full p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 ${
+                  item.favorite ? 'text-amber-500' : 'text-fg-faint hover:text-fg-faint'
                 }`}
               >
                 <Star aria-hidden="true" size={14} fill={item.favorite ? 'currentColor' : 'none'} />
@@ -449,9 +463,9 @@ export function ItemCard({
 
           <dl className="flex flex-col gap-1 text-xs">
             <div className="flex items-center justify-between gap-2">
-              <dt className="text-zinc-400">账号</dt>
+              <dt className="text-fg-faint">账号</dt>
               <dd
-                className="truncate font-medium text-zinc-700"
+                className="truncate font-medium text-fg-muted"
                 data-testid={`username-${item.id}`}
                 data-masked-locked={privacyLocked || undefined}
               >
@@ -459,8 +473,8 @@ export function ItemCard({
               </dd>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <dt className="text-zinc-400">密码</dt>
-              <dd className="font-mono text-zinc-700" data-testid={`password-${item.id}`}>
+              <dt className="text-fg-faint">密码</dt>
+              <dd className="font-mono text-fg-muted" data-testid={`password-${item.id}`}>
                 {revealed ?? MASKED}
               </dd>
             </div>
@@ -471,7 +485,7 @@ export function ItemCard({
               */}
             {item.strength !== undefined && item.visibility !== 'username_only' && !privacyLocked ? (
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-zinc-400">强度</dt>
+                <dt className="text-fg-faint">强度</dt>
                 <dd data-testid={`strength-${item.id}`}>
                   <StrengthDots level={item.strength} />
                 </dd>
@@ -484,16 +498,16 @@ export function ItemCard({
               <VisibilityBadge item={item} />
               {item.favorite ? <Badge tone="success">已收藏</Badge> : null}
             </div>
-            <span className="text-[11px] text-zinc-400">{formatRelative(item.updatedAt, now)}</span>
+            <span className="text-[11px] text-fg-faint">{formatRelative(item.updatedAt, now)}</span>
           </div>
 
           {selectMode ? null : (
-            <div className="flex items-center gap-1 border-t border-zinc-100 pt-3">
+            <div className="flex items-center gap-1 border-t border-line-subtle pt-3">
             <button
               type="button"
               aria-label="复制账号"
               onClick={() => guardCopy('username')}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+              className="rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
             >
               <Copy aria-hidden="true" size={14} />
             </button>
@@ -501,7 +515,7 @@ export function ItemCard({
               type="button"
               aria-label="复制密码"
               onClick={() => guardCopy('password')}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+              className="rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
             >
               <Clipboard aria-hidden="true" size={14} />
             </button>
@@ -519,7 +533,7 @@ export function ItemCard({
                 }
               }}
               onKeyUp={endReveal}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20 disabled:cursor-not-allowed disabled:text-zinc-200 disabled:hover:bg-transparent"
+              className="rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 disabled:cursor-not-allowed disabled:text-fg-faint disabled:hover:bg-transparent"
             >
               <Eye aria-hidden="true" size={14} />
             </button>
@@ -532,7 +546,7 @@ export function ItemCard({
                 aria-expanded={item.hasUrl && item.hasAppTarget ? jumpMenuOpen : undefined}
                 disabled={!item.hasUrl && !item.hasAppTarget}
                 onClick={handleOpen}
-                className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20 disabled:cursor-not-allowed disabled:text-zinc-200 disabled:hover:bg-transparent"
+                className="rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 disabled:cursor-not-allowed disabled:text-fg-faint disabled:hover:bg-transparent"
               >
                 <ExternalLink aria-hidden="true" size={14} />
               </button>
@@ -555,7 +569,7 @@ export function ItemCard({
               type="button"
               aria-label="编辑"
               onClick={() => handleEditPress()}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20"
+              className="rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20"
             >
               <Pencil aria-hidden="true" size={14} />
             </button>
@@ -563,7 +577,7 @@ export function ItemCard({
               type="button"
               aria-label="删除"
               onClick={handleDeletePress}
-              className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+              className="rounded-full p-1.5 text-fg-faint transition-colors hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
             >
               <Trash2 aria-hidden="true" size={14} />
             </button>

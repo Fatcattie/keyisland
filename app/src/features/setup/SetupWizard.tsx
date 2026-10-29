@@ -97,16 +97,16 @@ export function SetupWizard({ onReady }: SetupWizardProps): JSX.Element {
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-zinc-100 px-4 py-12">
-      <main className="w-full max-w-xl rounded-card border border-zinc-200 bg-white p-8 shadow-card">
+    <div className="flex min-h-full items-center justify-center bg-page px-4 py-12">
+      <main className="w-full max-w-xl rounded-card border border-line bg-surface p-8 shadow-card">
         <header className="mb-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-fg-faint">
             第 {step} / 3 步
           </p>
-          <h1 className="mt-1 text-xl font-semibold text-zinc-900">
+          <h1 className="mt-1 text-xl font-semibold text-fg">
             {step === 1 ? '设置主密码' : step === 2 ? '设置密码提示' : '保存恢复密钥'}
           </h1>
-          <p className="mt-2 text-xs leading-5 text-zinc-500">
+          <p className="mt-2 text-xs leading-5 text-fg-faint">
             {step === 1
               ? '主密码用于解密本地保险库，密岛不会保存它，也无法帮你找回。'
               : step === 2
@@ -148,7 +148,7 @@ export function SetupWizard({ onReady }: SetupWizardProps): JSX.Element {
               />
             </Field>
             {error !== null ? (
-              <p role="alert" className="text-xs font-medium text-red-600">
+              <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
                 {error}
               </p>
             ) : null}
@@ -174,7 +174,7 @@ export function SetupWizard({ onReady }: SetupWizardProps): JSX.Element {
               />
             </Field>
             {error !== null ? (
-              <p role="alert" className="text-xs font-medium text-red-600">
+              <p role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
                 {error}
               </p>
             ) : null}
@@ -191,22 +191,22 @@ export function SetupWizard({ onReady }: SetupWizardProps): JSX.Element {
 
         {step === 3 && result !== null ? (
           <div className="flex flex-col gap-4">
-            <div className="rounded-card border border-amber-200 bg-amber-50 p-4">
-              <p className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+            <div className="rounded-card border border-amber-200 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10 p-4">
+              <p className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-200">
                 <ShieldAlert aria-hidden="true" size={14} />
                 恢复码丢失 + 主密码遗忘 = 数据不可恢复
               </p>
-              <p className="mt-1.5 text-[11px] leading-5 text-amber-700">
+              <p className="mt-1.5 text-[11px] leading-5 text-amber-700 dark:text-amber-300">
                 恢复码等价于备用钥匙，任何拿到它的人都能重设你的主密码。请抄写到纸上或存进离线密码管理器，
                 不要截图、不要发到聊天工具里。
               </p>
             </div>
 
             <div>
-              <p className="mb-1.5 text-xs font-medium text-zinc-700">你的恢复码</p>
+              <p className="mb-1.5 text-xs font-medium text-fg-muted">你的恢复码</p>
               <p
                 data-testid="recovery-code"
-                className="select-all break-all rounded-card border border-zinc-200 bg-zinc-50 px-4 py-3 font-mono text-sm tracking-wider text-zinc-900"
+                className="select-all break-all rounded-card border border-line bg-surface-muted px-4 py-3 font-mono text-sm tracking-wider text-fg"
               >
                 {result.recoveryCode}
               </p>
@@ -221,11 +221,11 @@ export function SetupWizard({ onReady }: SetupWizardProps): JSX.Element {
               </Button>
             </div>
 
-            <label htmlFor="setup-saved" className="flex items-start gap-2 text-xs text-zinc-700">
+            <label htmlFor="setup-saved" className="flex items-start gap-2 text-xs text-fg-muted">
               <input
                 id="setup-saved"
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 rounded border-zinc-300"
+                className="mt-0.5 h-4 w-4 rounded border-line-strong"
                 checked={saved}
                 onChange={(event) => setSaved(event.target.checked)}
               />

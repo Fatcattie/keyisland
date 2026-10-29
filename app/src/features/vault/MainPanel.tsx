@@ -21,8 +21,10 @@ import {
 } from 'lucide-react';
 import { useVaultClient } from '../../app/VaultProvider';
 import { Button } from '../../components/ui/Button';
+import { ElasticToggle } from '../../components/ui/ElasticToggle';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
+import { useThemeStore } from '../../stores/theme-store';
 import { useUiStore } from '../../stores/ui-store';
 import { useCountdown } from '../../lib/hooks';
 import { describeError } from '../../lib/i18n';
@@ -109,6 +111,9 @@ export function MainPanel({
   const shortcuts = useUiStore((state) => state.shortcuts);
   const setViewMode = useUiStore((state) => state.setViewMode);
   const openIsland = useUiStore((state) => state.openIsland);
+  /** 主题：只在这里读一次，开关与文案共用。 */
+  const themeMode = useThemeStore((state) => state.mode);
+  const setThemeMode = useThemeStore((state) => state.setMode);
 
   /**
    * 导航里的分类 = 预设 ∪ 数据里出现过的分类（PRD FR-03「分类可自定义」）。
@@ -529,17 +534,17 @@ export function MainPanel({
 
   return (
     <div
-      className={`flex min-h-full flex-col bg-zinc-100${hidden ? ' hidden' : ''}`}
+      className={`flex min-h-full flex-col bg-page${hidden ? ' hidden' : ''}`}
       aria-hidden={hidden ? true : undefined}
     >
       <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-6 pb-16 pt-12">
         {/* 左侧导航 */}
         <aside className="hidden w-48 shrink-0 flex-col gap-1 lg:flex" aria-label="资产导航">
           <div className="mb-3 flex items-center gap-2 px-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 text-white">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-accent-fg">
               <ShieldCheck aria-hidden="true" size={14} />
             </span>
-            <span className="text-sm font-semibold text-zinc-900">密岛</span>
+            <span className="text-sm font-semibold text-fg">密岛</span>
           </div>
           {navItems.map((item, index) => {
             const active = category === item.key;
@@ -549,7 +554,7 @@ export function MainPanel({
             return (
               <Fragment key={item.key}>
                 {showGroupHeading ? (
-                  <p className="mt-3 mb-0.5 px-3 text-[10px] font-semibold tracking-wide text-zinc-400">
+                  <p className="mt-3 mb-0.5 px-3 text-[10px] font-semibold tracking-wide text-fg-faint">
                     {item.group}
                   </p>
                 ) : null}
@@ -559,8 +564,8 @@ export function MainPanel({
                   onClick={() => handleNav(item.key)}
                   className={`rounded-pill px-3 py-2 text-left text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-white text-zinc-900 shadow-card'
-                      : 'text-zinc-600 hover:bg-white/60 hover:text-zinc-900'
+                      ? 'bg-surface text-fg shadow-card'
+                      : 'text-fg-subtle hover:bg-surface/60 hover:text-fg'
                   }`}
                 >
                   {item.label}
@@ -569,10 +574,25 @@ export function MainPanel({
             );
           })}
           <div className="mt-auto flex flex-col gap-1">
+            {/**
+             * 主题开关放在侧栏底部（与「设置 / 立即锁定」同组）：
+             * 主题是"整个应用的外观"，不是某个面板的局部选项，放在导航末尾
+             * 比塞进设置二级页更好找——主流桌面软件的换肤开关基本都在这个位置。
+             */}
+            <div className="mb-1 flex items-center justify-between rounded-pill px-3 py-1.5">
+              <span className="text-xs font-medium text-fg-subtle">
+                {themeMode === 'dark' ? '黑夜' : '白天'}
+              </span>
+              <ElasticToggle
+                checked={themeMode === 'dark'}
+                onCheckedChange={(next) => setThemeMode(next ? 'dark' : 'light')}
+                label="切换白天 / 黑夜模式"
+              />
+            </div>
             <button
               type="button"
               onClick={() => onSettingsOpenChange(true)}
-              className="flex items-center gap-2 rounded-pill px-3 py-2 text-left text-xs font-medium text-zinc-600 transition-colors hover:bg-white/60 hover:text-zinc-900"
+              className="flex items-center gap-2 rounded-pill px-3 py-2 text-left text-xs font-medium text-fg-subtle transition-colors hover:bg-surface/60 hover:text-fg"
             >
               <Settings aria-hidden="true" size={13} />
               设置
@@ -580,7 +600,7 @@ export function MainPanel({
             <button
               type="button"
               onClick={handleLock}
-              className="rounded-pill px-3 py-2 text-left text-xs font-medium text-zinc-600 transition-colors hover:bg-white/60 hover:text-zinc-900"
+              className="rounded-pill px-3 py-2 text-left text-xs font-medium text-fg-subtle transition-colors hover:bg-surface/60 hover:text-fg"
             >
               立即锁定
             </button>
@@ -592,7 +612,7 @@ export function MainPanel({
           <header className="flex flex-wrap items-center gap-3">
             {selectMode ? (
               <>
-                <span className="text-sm font-medium text-zinc-900" data-testid="bulk-count">
+                <span className="text-sm font-medium text-fg" data-testid="bulk-count">
                   已选 {selectedIds.size} 张
                 </span>
                 <Button variant="secondary" size="md" onClick={toggleSelectAll}>
@@ -617,7 +637,7 @@ export function MainPanel({
                   <Search
                     aria-hidden="true"
                     size={14}
-                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-faint"
                   />
                   <input
                     ref={searchRef}
@@ -627,14 +647,14 @@ export function MainPanel({
                     placeholder="搜索标题、平台、账号、标签…（按 / 聚焦）"
                     value={query}
                     onChange={(event) => handleQueryChange(event.target.value)}
-                    className="h-10 w-full rounded-pill border border-zinc-200 bg-white pl-9 pr-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                    className="h-10 w-full rounded-pill border border-line bg-surface pl-9 pr-4 text-sm text-fg placeholder:text-fg-faint focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-accent/10"
                   />
                 </div>
                 {/* PRD FR-03「右侧卡片网格（可切列表视图）」。 */}
                 <div
                   role="group"
                   aria-label="展示方式"
-                  className="flex items-center gap-0.5 rounded-pill border border-zinc-200 bg-white p-0.5"
+                  className="flex items-center gap-0.5 rounded-pill border border-line bg-surface p-0.5"
                 >
                   <button
                     type="button"
@@ -644,8 +664,8 @@ export function MainPanel({
                     onClick={() => setViewMode('grid')}
                     className={
                       viewMode === 'grid'
-                        ? 'rounded-full bg-zinc-900 p-1.5 text-white'
-                        : 'rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800'
+                        ? 'rounded-full bg-accent p-1.5 text-accent-fg'
+                        : 'rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg'
                     }
                   >
                     <LayoutGrid aria-hidden="true" size={14} />
@@ -658,8 +678,8 @@ export function MainPanel({
                     onClick={() => setViewMode('list')}
                     className={
                       viewMode === 'list'
-                        ? 'rounded-full bg-zinc-900 p-1.5 text-white'
-                        : 'rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800'
+                        ? 'rounded-full bg-accent p-1.5 text-accent-fg'
+                        : 'rounded-full p-1.5 text-fg-faint transition-colors hover:bg-surface-sunken hover:text-fg'
                     }
                   >
                     <List aria-hidden="true" size={14} />
@@ -672,7 +692,7 @@ export function MainPanel({
                   id="vault-sort"
                   value={sort}
                   onChange={(event) => setSort(event.target.value as SortMode)}
-                  className="h-10 rounded-pill border border-zinc-200 bg-white px-3 text-xs text-zinc-700 focus:border-zinc-400 focus:outline-none"
+                  className="h-10 rounded-pill border border-line bg-surface px-3 text-xs text-fg-muted focus:border-line-strong focus:outline-none"
                 >
                   {SORT_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -741,20 +761,20 @@ export function MainPanel({
           </header>
 
           <div className="flex items-center justify-between px-1">
-            <h1 className="text-sm font-semibold text-zinc-900">
+            <h1 className="text-sm font-semibold text-fg">
               {category === 'hidden' ? '隐藏卡片' : navItems.find((item) => item.key === category)?.label ?? '全部'}
             </h1>
-            <span className="text-[11px] text-zinc-500">{items.length} 张</span>
+            <span className="text-[11px] text-fg-faint">{items.length} 张</span>
           </div>
 
           {loading ? (
-            <p className="px-1 text-xs text-zinc-500">正在解密资产…</p>
+            <p className="px-1 text-xs text-fg-faint">正在解密资产…</p>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-card border border-dashed border-zinc-300 bg-white/60 py-16 text-center">
-              <p className="text-sm font-medium text-zinc-700">
+            <div className="flex flex-col items-center justify-center gap-2 rounded-card border border-dashed border-line-strong bg-surface/60 py-16 text-center">
+              <p className="text-sm font-medium text-fg-muted">
                 {emptySearch ? '没有匹配的资产' : category === 'hidden' ? '还没有隐藏卡片' : '还没有资产'}
               </p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-fg-faint">
                 {emptySearch ? '换个关键词试试，或清空搜索条件' : '点击右上角「新建卡片」开始'}
               </p>
             </div>
@@ -790,8 +810,8 @@ export function MainPanel({
       </div>
 
       {/* 底部状态条 */}
-      <footer className="sticky bottom-0 border-t border-zinc-200 bg-white/80 px-6 py-2 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between text-[11px] text-zinc-500">
+      <footer className="sticky bottom-0 border-t border-line bg-surface/80 px-6 py-2 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between text-[11px] text-fg-faint">
           <span className="flex items-center gap-1.5">
             <ShieldCheck aria-hidden="true" size={12} className="text-emerald-600" />
             本地加密 · 无云端连接
@@ -880,7 +900,7 @@ export function MainPanel({
           </>
         }
       >
-        <p className="text-xs leading-6 text-zinc-600">
+        <p className="text-xs leading-6 text-fg-subtle">
           删除后该卡片的账号与密码将无法恢复，恢复码也不能找回已删除的内容。
         </p>
       </Modal>
@@ -911,7 +931,7 @@ export function MainPanel({
             void handleBulkDelete();
           }}
         >
-          <label className="text-xs font-medium text-zinc-700" htmlFor="bulk-master-password">
+          <label className="text-xs font-medium text-fg-muted" htmlFor="bulk-master-password">
             主密码
           </label>
           <input
@@ -922,9 +942,9 @@ export function MainPanel({
             placeholder="输入主密码以确认"
             value={bulkPassword}
             onChange={(event) => setBulkPassword(event.target.value)}
-            className="mt-2 h-10 w-full rounded-pill border border-zinc-200 bg-white px-4 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+            className="mt-2 h-10 w-full rounded-pill border border-line bg-surface px-4 text-sm text-fg placeholder:text-fg-faint focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-accent/10"
           />
-          <p className="mt-3 text-xs leading-5 text-zinc-500">
+          <p className="mt-3 text-xs leading-5 text-fg-faint">
             批量删除属于高危操作，需要重新验证主密码。删除后账号与密码都无法恢复，恢复码也不能找回已删除的内容。
           </p>
         </form>

@@ -7,6 +7,62 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+
+  /**
+   * 主题语义色（RGB 三元组，供 Tailwind 的 `rgb(var(--x) / <alpha-value>)` 用）。
+   *
+   * 亮色取值与改造前的 zinc 刻度**逐位相等**：没切到深色时界面像素不变，
+   * 这样"加主题"这件事不会顺手改掉既有视觉。
+   */
+  --ki-surface: 255 255 255; /* = white   卡片/面板底 */
+  --ki-surface-muted: 250 250 250; /* = zinc-50  页面次级底 */
+  --ki-surface-sunken: 244 244 245; /* = zinc-100 内凹区域/悬停底 */
+  --ki-line-subtle: 244 244 245; /* = zinc-100 弱分割线 */
+  --ki-line: 228 228 231; /* = zinc-200 主边框 */
+  --ki-line-strong: 212 212 216; /* = zinc-300 强调边框 */
+  --ki-fg: 24 24 27; /* = zinc-900 主文字 */
+  --ki-fg-muted: 63 63 70; /* = zinc-700 次文字 */
+  --ki-fg-subtle: 82 82 91; /* = zinc-600 三级文字 */
+  --ki-fg-faint: 113 113 122; /* = zinc-500 弱说明 */
+  --ki-accent: 24 24 27; /* = zinc-900 主按钮底 */
+  --ki-accent-fg: 255 255 255; /* = white   主按钮字 */
+  --ki-page: 244 244 245; /* = zinc-100 页面底 */
+  --ki-page-fg: 24 24 27;
+
+  /**
+   * 卡片上的指针光晕（跟随鼠标的白色高光）。
+   * 亮色下卡片本身就是白的，光晕几乎看不见；深色下同一个白色会变成一大团白斑，
+   * 所以只留一个"强度"变量，按主题给不同的 alpha。
+   */
+  --ki-glow-a: 0.9;
+}
+
+/**
+ * 深色主题。由 `theme-store` 在 `<html>` 上切 `dark` 类。
+ *
+ * 只改令牌、不改组件：这正是把颜色收进语义色的意义——主题是"一层变量"，
+ * 不是"每个组件里的 if"。
+ */
+.dark {
+  color-scheme: dark;
+  --ki-surface: 24 24 27; /* zinc-900 */
+  --ki-surface-muted: 31 31 35; /* 比 surface 略亮一档 */
+  --ki-surface-sunken: 39 39 42; /* zinc-800 */
+  --ki-line-subtle: 39 39 42;
+  --ki-line: 63 63 70; /* zinc-700 */
+  --ki-line-strong: 82 82 91; /* zinc-600 */
+  --ki-fg: 250 250 250; /* zinc-50 */
+  /* 深色下"次级文字"整体抬一档：同样的 zinc 阶梯放在近黑底上，
+     感知对比度会比放在白底上低一截，不抬就会显得发灰、读起来费劲。 */
+  --ki-fg-muted: 229 229 231; /* zinc-200 */
+  --ki-fg-subtle: 212 212 216; /* zinc-300 */
+  --ki-fg-faint: 161 161 170; /* zinc-400 */
+  --ki-accent: 250 250 250; /* 深色下主按钮反相成浅色 */
+  --ki-accent-fg: 24 24 27;
+  --ki-page: 9 9 11; /* zinc-950 */
+  --ki-page-fg: 250 250 250;
+  /* 白色光晕在深色卡片上极易过曝，压到 1/9 左右只留一层微光。 */
+  --ki-glow-a: 0.1;
 }
 
 html,
@@ -17,8 +73,8 @@ body,
 
 body {
   margin: 0;
-  background-color: #f4f4f5;
-  color: #18181b;
+  background-color: rgb(var(--ki-page));
+  color: rgb(var(--ki-page-fg));
 }
 
 /* 尊重系统的"减少动态效果"偏好（SDD §6.3）。 */

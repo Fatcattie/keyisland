@@ -29,7 +29,7 @@ export function Field({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-zinc-700">
+      <label htmlFor={htmlFor} className="text-xs font-medium text-fg-muted">
         {label}
         {required ? (
           <span className="ml-1 text-red-600" aria-hidden="true">
@@ -40,7 +40,7 @@ export function Field({
       </label>
       {children}
       {hint !== undefined && error === undefined ? (
-        <p id={hintId} className="text-[11px] leading-4 text-zinc-500">
+        <p id={hintId} className="text-[11px] leading-4 text-fg-faint">
           {hint}
         </p>
       ) : null}
@@ -55,11 +55,11 @@ export function Field({
 
 /** 统一输入框样式，供各表单复用。 */
 export const INPUT_CLASS =
-  'h-10 w-full rounded-pill border border-zinc-200 bg-white px-4 text-sm text-zinc-900 ' +
-  'placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 ' +
-  'disabled:bg-zinc-50 disabled:text-zinc-400';
+  'h-10 w-full rounded-pill border border-line bg-surface px-4 text-sm text-fg ' +
+  'placeholder:text-fg-faint focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-accent/10 ' +
+  'disabled:bg-surface-muted disabled:text-fg-faint';
 
 /** 多行输入样式。 */
 export const TEXTAREA_CLASS =
-  'min-h-[80px] w-full rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 ' +
-  'placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900/10';
+  'min-h-[80px] w-full rounded-2xl border border-line bg-surface px-4 py-2.5 text-sm text-fg ' +
+  'placeholder:text-fg-faint focus:border-line-strong focus:outline-none focus:ring-2 focus:ring-accent/10';

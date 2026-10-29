@@ -83,8 +83,8 @@ export default function App(): JSX.Element {
 
   if (startup === undefined) {
     return (
-      <div className="flex min-h-full items-center justify-center bg-zinc-100">
-        <p role="status" className="text-xs text-zinc-500">
+      <div className="flex min-h-full items-center justify-center bg-page">
+        <p role="status" className="text-xs text-fg-faint">
           正在准备本地保险库…
         </p>
       </div>

@@ -8,7 +8,24 @@
  * - 无法识别的列不猜：只有标题缺失或凭据缺失的行才会被跳过，并给出原因。
  */
 
-import type { CreateItemInput } from './types';
+import type { CreateItemInput, Visibility } from './types';
+import { DEFAULT_CATEGORIES } from './categories';
+
+/**
+ * 导入时的默认值。
+ *
+ * 语义是**兜底而不是覆盖**：CSV 里写了分类就用 CSV 的，没写才落到默认分类；
+ * 隐私档位 CSV 里没有这一列，所以一律用这里的值。
+ *
+ * 为什么要能选档位：批量导入的账号往往是最该防偷看的（老网站、共享账号），
+ * 全都以「普通」进来，等于把风险一次性摊在屏幕上。
+ */
+export interface CsvImportOptions {
+  /** 分类为空时的兜底值，默认「其他」。 */
+  defaultCategory?: string;
+  /** 所有导入卡片的隐私档位，默认「普通」。 */
+  defaultVisibility?: Visibility;
+}
 
 /** 可直接用 Excel / WPS 打开的 UTF-8 CSV 模板。 */
 export const CSV_TEMPLATE =
@@ -200,7 +217,13 @@ export interface CsvImportPreview {
 }
 
 /** 从 CSV 文本得到待创建条目。跳过项只给原因，不包含任何字段内容。 */
-export function previewCsvImport(text: string, override?: Partial<Record<CsvFieldKey, string | null>>): CsvImportPreview {
+export function previewCsvImport(
+  text: string,
+  override?: Partial<Record<CsvFieldKey, string | null>>,
+  options: CsvImportOptions = {},
+): CsvImportPreview {
+  const defaultCategory = options.defaultCategory ?? DEFAULT_CATEGORIES[DEFAULT_CATEGORIES.length - 1];
+  const defaultVisibility = options.defaultVisibility ?? 'normal';
   const rows = parseCsvRows(text);
   if (rows.length === 0) {
     throw new Error('CSV 文件为空');
@@ -244,7 +267,9 @@ export function previewCsvImport(text: string, override?: Partial<Record<CsvFiel
       title: title.length > 0 ? title : username,
       username,
       password,
-      category: '其他',
+      // CSV 自带分类优先；没写才用用户选的默认分类。
+      category: category.length > 0 ? category : defaultCategory,
+      visibility: defaultVisibility,
     };
     if (url.length > 0) {
       item.url = url;
@@ -257,9 +282,6 @@ export function previewCsvImport(text: string, override?: Partial<Record<CsvFiel
     }
     if (appPath.length > 0) {
       item.appPath = appPath;
-    }
-    if (category.length > 0) {
-      item.category = category;
     }
     if (tags.length > 0) {
       item.tags = tags.split(/[;,，；、]/).map((tag) => tag.trim()).filter(Boolean);

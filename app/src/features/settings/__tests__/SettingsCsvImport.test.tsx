@@ -100,6 +100,29 @@ describe('设置面板 · CSV 导入', () => {
     expect(list[0].title).toBe('GitHub');
   });
 
+  it('可以给整批导入选隐私档位与默认分类', async () => {
+    const client = await renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: '导入 CSV' }));
+
+    // 先选好档位与默认分类，再选文件：改默认值本身就要能重算预览。
+    fireEvent.change(screen.getByLabelText('隐私档位'), { target: { value: 'masked' } });
+    fireEvent.change(screen.getByLabelText('默认分类'), { target: { value: '工作' } });
+    pick(screen.getByLabelText('CSV 文件'), csvFile('name,username,password\nGitHub,octocat,Pass-1-Aa1!\n'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '导入 1 张卡片' })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '导入 1 张卡片' }));
+    await waitFor(() => {
+      expect(screen.getByText(/已导入 1 张卡片/)).toBeDefined();
+    });
+
+    const list = await client.listItems();
+    expect(list).toHaveLength(1);
+    expect(list[0].category).toBe('工作');
+    expect(list[0].visibility).toBe('masked');
+  });
+
   it('确认导入后条目真的入库（走真实加密链路）', async () => {
     const client = await renderPanel();
     fireEvent.click(screen.getByRole('button', { name: '导入 CSV' }));

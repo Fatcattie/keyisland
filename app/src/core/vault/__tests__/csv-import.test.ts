@@ -85,6 +85,25 @@ describe('CSV 解析', () => {
     ]);
   });
 
+  it('默认分类只做兜底，CSV 自带分类优先', () => {
+    const text = ['name,username,password,category', 'GitHub,octocat,Pass-1-Aa1!,开发', 'Mail,me@example.com,Pass-2-Bb2!,'].join('\n');
+    const preview = previewCsvImport(text, undefined, { defaultCategory: '工作' });
+    expect(preview.items[0].category).toBe('开发');
+    expect(preview.items[1].category).toBe('工作');
+  });
+
+  it('隐私档位对整批条目生效', () => {
+    const text = ['name,username,password', 'A,a,Pass-1-Aa1!', 'B,b,Pass-2-Bb2!'].join('\n');
+    const preview = previewCsvImport(text, undefined, { defaultVisibility: 'masked' });
+    expect(preview.items.map((item) => item.visibility)).toEqual(['masked', 'masked']);
+  });
+
+  it('不传选项时保持原行为（其他 / 普通）', () => {
+    const preview = previewCsvImport('name,username,password\nGitHub,octocat,Pass-1-Aa1!\n');
+    expect(preview.items[0].category).toBe('其他');
+    expect(preview.items[0].visibility).toBe('normal');
+  });
+
   it('标题缺失时用账号兜底，空文件报错', () => {
     const preview = previewCsvImport('name,username,password\n,u@example.com,Pass-1-Aa1!\n');
     expect(preview.items).toHaveLength(1);

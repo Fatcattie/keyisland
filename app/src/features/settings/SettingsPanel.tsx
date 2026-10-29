@@ -13,10 +13,11 @@ import { useToast } from '../../components/ui/Toast';
 import { useVaultClient } from '../../app/VaultProvider';
 import { describeError } from '../../lib/i18n';
 import { downloadTextFile } from '../../lib/format';
-import type { AutoLockPolicy, SessionSnapshot } from '../../core/vault/types';
+import type { AutoLockPolicy, SessionSnapshot, Visibility } from '../../core/vault/types';
 import { CLIPBOARD_TTL_OPTIONS } from '../../core/vault/types';
 import { isBackupEnvelope } from '../../core/vault/backup';
 import { isAssetTransferEnvelope } from '../../core/vault/asset-transfer';
+import { DEFAULT_CATEGORIES } from '../../core/vault/categories';
 import type { VaultHealthReport } from '../../core/vault/health';
 import { isHealthy } from '../../core/vault/health';
 import {
@@ -81,6 +82,22 @@ function blankCsvMapping(): CsvColumnMapping {
     tags: null,
   };
 }
+
+/** CSV 导入的默认分类（"其他"）。 */
+const DEFAULT_CATEGORY_OPTION = '其他';
+
+/**
+ * 导入时可选的隐私档位。
+ *
+ * 与 `ItemEditor` 里那份带 hint 的选项是两种用途：那边解释"这档是什么意思"，
+ * 这边只需要一个短标签。档位取值本身来自 `Visibility`，不会漂移。
+ */
+const IMPORT_VISIBILITY_OPTIONS: ReadonlyArray<{ value: Visibility; label: string }> = [
+  { value: 'normal', label: '普通' },
+  { value: 'username_only', label: '仅账号' },
+  { value: 'masked', label: '遮罩' },
+  { value: 'hidden', label: '隐藏' },
+];
 
 /** 自动锁定档位。 */
 const POLICY_OPTIONS: ReadonlyArray<{ value: AutoLockPolicy; label: string }> = [
@@ -512,6 +529,9 @@ export function SettingsPanel({
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvMapping, setCsvMapping] = useState<CsvColumnMapping | null>(null);
+  /** 导入默认值：CSV 里没写分类时用它；隐私档位对整批生效。 */
+  const [csvDefaultCategory, setCsvDefaultCategory] = useState<string>(DEFAULT_CATEGORY_OPTION);
+  const [csvDefaultVisibility, setCsvDefaultVisibility] = useState<Visibility>('normal');
   const [healthBusy, setHealthBusy] = useState(false);
   const [health, setHealth] = useState<VaultHealthReport | null>(null);
   const [storageLocation, setStorageLocation] = useState<StorageLocation | null>(null);
@@ -1086,7 +1106,12 @@ export function SettingsPanel({
       try {
         const mapping = resolveCsvColumns(header);
         setCsvMapping(mapping);
-        setCsvPreview(previewCsvImport(text, mapping));
+        setCsvPreview(
+          previewCsvImport(text, mapping, {
+            defaultCategory: csvDefaultCategory,
+            defaultVisibility: csvDefaultVisibility,
+          }),
+        );
       } catch {
         // 自动识别不出来 → 给一张空映射表，让用户自己指定三列必填字段。
         setCsvMapping(blankCsvMapping());
@@ -1097,16 +1122,20 @@ export function SettingsPanel({
     }
   };
 
-  const updateCsvMapping = (field: CsvFieldKey, column: string | null): void => {
-    const next = { ...(csvMapping ?? blankCsvMapping()), [field]: column } as CsvColumnMapping;
-    setCsvMapping(next);
-
+  /**
+   * 用「映射 + 默认值」重算预览。映射变化与默认值变化走同一条路径，
+   * 避免两处逻辑各写一遍后悄悄分叉。
+   */
+  const refreshCsvPreview = (
+    mapping: CsvColumnMapping,
+    defaults: { category: string; visibility: Visibility },
+  ): void => {
     // 只把用户真正选过的列作为覆盖项：
     // - 必填三列留空时交给自动识别再试一次，失败才提示"请选择"；
     // - 可选列留空是明确的「不导入」，必须传 null，否则会被自动识别又捡回来。
     const override: Partial<Record<CsvFieldKey, string | null>> = {};
-    for (const key of Object.keys(next) as CsvFieldKey[]) {
-      const value = next[key] ?? null;
+    for (const key of Object.keys(mapping) as CsvFieldKey[]) {
+      const value = mapping[key] ?? null;
       const required = key === 'title' || key === 'username' || key === 'password';
       if (required) {
         if (value !== null && value !== '') {
@@ -1118,7 +1147,10 @@ export function SettingsPanel({
     }
 
     try {
-      const preview = previewCsvImport(csvText, override);
+      const preview = previewCsvImport(csvText, override, {
+        defaultCategory: defaults.category,
+        defaultVisibility: defaults.visibility,
+      });
       // 用「实际生效的映射」回填：否则清空必填列后自动识别会悄悄捡回来，
       // 界面显示"未选择"、实际却按某一列导入，这种不一致最难查。
       setCsvMapping(preview.mapping);
@@ -1128,6 +1160,24 @@ export function SettingsPanel({
       setCsvPreview(null);
       setCsvError('请为名称、账号和密码分别选择一列');
     }
+  };
+
+  const updateCsvMapping = (field: CsvFieldKey, column: string | null): void => {
+    const next = { ...(csvMapping ?? blankCsvMapping()), [field]: column } as CsvColumnMapping;
+    setCsvMapping(next);
+    refreshCsvPreview(next, { category: csvDefaultCategory, visibility: csvDefaultVisibility });
+  };
+
+  const updateCsvDefaults = (patch: { category?: string; visibility?: Visibility }): void => {
+    const category = patch.category ?? csvDefaultCategory;
+    const visibility = patch.visibility ?? csvDefaultVisibility;
+    setCsvDefaultCategory(category);
+    setCsvDefaultVisibility(visibility);
+    // 还没选文件时没有可重算的预览，改默认值只影响下一次导入。
+    if (csvMapping === null || csvText.length === 0) {
+      return;
+    }
+    refreshCsvPreview(csvMapping, { category, visibility });
   };
 
   /** 批量原子创建：校验或写盘失败时不留下半批卡片。 */
@@ -1486,6 +1536,37 @@ export function SettingsPanel({
                   {csvError}
                 </p>
               ) : null}
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Field label="默认分类" htmlFor="settings-csv-category" hint="CSV 里没写分类时用它">
+                  <select
+                    id="settings-csv-category"
+                    className={INPUT_CLASS}
+                    value={csvDefaultCategory}
+                    onChange={(event) => updateCsvDefaults({ category: event.target.value })}
+                  >
+                    {DEFAULT_CATEGORIES.map((category) => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="隐私档位" htmlFor="settings-csv-visibility" hint="这批卡片统一用这一档">
+                  <select
+                    id="settings-csv-visibility"
+                    className={INPUT_CLASS}
+                    value={csvDefaultVisibility}
+                    onChange={(event) => updateCsvDefaults({ visibility: event.target.value as Visibility })}
+                  >
+                    {IMPORT_VISIBILITY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
 
               {csvHeaders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 rounded-card border border-line bg-surface-muted p-3 sm:grid-cols-2">

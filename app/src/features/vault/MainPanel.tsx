@@ -40,13 +40,19 @@ import type {
   SessionSnapshot,
   SortMode,
 } from '../../core/vault/types';
+import { DEFAULT_CATEGORIES } from '../../core/vault/categories';
 import { ItemCard } from './ItemCard';
 import { ItemEditor } from './ItemEditor';
 import { HiddenAccessDialog } from './HiddenAccessDialog';
 import { SettingsPanel } from '../settings/SettingsPanel';
 
-/** 预设分类（PRD 分类体系）。 */
-const CATEGORIES: readonly string[] = ['开发', '工作', '娱乐', '社交', '购物', '金融', '其他'];
+/**
+ * 预设分类（PRD 分类体系）。
+ *
+ * 清单放在 core：设置页「CSV 默认分类」用的是同一份，
+ * 两边各写一份早晚会漂移成两套分类。
+ */
+const CATEGORIES: readonly string[] = DEFAULT_CATEGORIES;
 
 /**
  * 标签导航项的 key 前缀。

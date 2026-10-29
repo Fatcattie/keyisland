@@ -17,4 +17,5 @@ export * from './generator';
 export * from './backup';
 export * from './asset-transfer';
 export * from './csv-import';
+export * from './categories';
 export * from './audit';

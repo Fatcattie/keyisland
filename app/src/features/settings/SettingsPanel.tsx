@@ -17,7 +17,15 @@ import type { AutoLockPolicy, SessionSnapshot } from '../../core/vault/types';
 import { CLIPBOARD_TTL_OPTIONS } from '../../core/vault/types';
 import type { VaultHealthReport } from '../../core/vault/health';
 import { isHealthy } from '../../core/vault/health';
-import { previewCsvImport, type CsvImportPreview } from '../../core/vault/csv-import';
+import {
+  csvTemplateText,
+  parseCsvRows,
+  previewCsvImport,
+  resolveCsvColumns,
+  type CsvColumnMapping,
+  type CsvFieldKey,
+  type CsvImportPreview,
+} from '../../core/vault/csv-import';
 import type { StorageLocation } from '../../services/storage';
 import { isDesktopShell, revealStorageFolder } from '../../services/tauri-storage';
 import type { BackupStatus, HotzoneConfigPatch } from '../../services/vault-client';
@@ -465,6 +473,12 @@ export function SettingsPanel({
   const [busy, setBusy] = useState(false);
   const [backupPassword, setBackupPassword] = useState('');
   const [backupOpen, setBackupOpen] = useState(false);
+  const [bundleOpen, setBundleOpen] = useState(false);
+  const [bundleImportText, setBundleImportText] = useState('');
+  const [bundleImportPassword, setBundleImportPassword] = useState('');
+  const [bundleExportPassword, setBundleExportPassword] = useState('');
+  const [bundlePreview, setBundlePreview] = useState<{ total: number; inserted: number; skipped: number } | null>(null);
+  const [bundlePreviewError, setBundlePreviewError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importMode, setImportMode] = useState<BackupMode>('merge');
@@ -474,6 +488,8 @@ export function SettingsPanel({
   const [csvText, setCsvText] = useState('');
   const [csvPreview, setCsvPreview] = useState<CsvImportPreview | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvMapping, setCsvMapping] = useState<CsvColumnMapping | null>(null);
   const [healthBusy, setHealthBusy] = useState(false);
   const [health, setHealth] = useState<VaultHealthReport | null>(null);
   const [storageLocation, setStorageLocation] = useState<StorageLocation | null>(null);
@@ -858,6 +874,68 @@ export function SettingsPanel({
     }
   };
 
+  const handleExportAssetBundle = async (): Promise<void> => {
+    const password = bundleExportPassword;
+    if (password.length === 0) {
+      toast('请输入当前主密码');
+      return;
+    }
+    setBusy(true);
+    try {
+      await client.verifyMasterPassword(password);
+      const text = await client.exportAssetBundle(password);
+      const filename = `keyisland-assets-${new Date().toISOString().slice(0, 10)}.kia`;
+      if (!downloadTextFile(filename, text, 'application/octet-stream')) {
+        toast('保存文件失败，资产包未导出；请重试');
+        return;
+      }
+      toast('已导出加密资产包，可在另一库中增量导入');
+      setBundleExportPassword('');
+    } catch (caught) {
+      toast(describeError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePreviewAssetBundle = async (): Promise<void> => {
+    if (bundleImportText.trim().length === 0 || bundleImportPassword.length === 0) {
+      toast('请选择资产包并输入导出时使用的主密码');
+      return;
+    }
+    setBusy(true);
+    setBundlePreviewError(null);
+    try {
+      setBundlePreview(await client.previewAssetBundle(bundleImportPassword, bundleImportText.trim()));
+    } catch (caught) {
+      setBundlePreview(null);
+      setBundlePreviewError(describeError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleImportAssetBundle = async (): Promise<void> => {
+    if (bundleImportText.trim().length === 0 || bundleImportPassword.length === 0) {
+      toast('请选择资产包并输入导出时使用的主密码');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await client.importAssetBundle(bundleImportPassword, bundleImportText.trim());
+      toast(`导入完成：新增 ${result.inserted} 张，跳过完全相同的 ${result.skipped} 张；原有卡片未修改`);
+      onDataChanged();
+      setBundleImportText('');
+      setBundleImportPassword('');
+      setBundlePreview(null);
+      setBundleOpen(false);
+    } catch (caught) {
+      toast(describeError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleImportBackup = async (): Promise<void> => {
     if (importText.trim().length === 0) {
       toast('请选择或粘贴备份文件内容');
@@ -903,6 +981,24 @@ export function SettingsPanel({
     }
   };
 
+  const handlePickAssetBundle = async (file: File): Promise<void> => {
+    try {
+      const text = typeof file.text === 'function'
+        ? await file.text()
+        : await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (): void => resolve(typeof reader.result === 'string' ? reader.result : '');
+            reader.onerror = (): void => reject(new Error('无法读取该文件'));
+            reader.readAsText(file);
+          });
+      setBundleImportText(text);
+      setBundlePreview(null);
+      setBundlePreviewError(null);
+    } catch {
+      toast('无法读取该文件，请确认它是 .kia 加密资产包');
+    }
+  };
+
   const handlePickFile = async (file: File): Promise<void> => {
     try {
       const text =
@@ -942,8 +1038,13 @@ export function SettingsPanel({
             });
       setCsvText(text);
       setCsvError(null);
+      setCsvMapping(null);
       try {
-        setCsvPreview(previewCsvImport(text));
+        const rows = parseCsvRows(text);
+        const mapping = resolveCsvColumns(rows[0] ?? []);
+        setCsvHeaders(rows[0] ?? []);
+        setCsvMapping(mapping);
+        setCsvPreview(previewCsvImport(text, mapping));
       } catch {
         setCsvPreview(null);
         setCsvError('无法识别这个 CSV：需要包含「名称/账号/密码」三列');
@@ -953,27 +1054,39 @@ export function SettingsPanel({
     }
   };
 
-  /** 逐条创建；任一条失败就停止并报告已导入数量，避免半途而废又无提示。 */
+  const updateCsvMapping = (field: CsvFieldKey, column: string | null): void => {
+    if (csvMapping === null) return;
+    const next = { ...csvMapping, [field]: column } as CsvColumnMapping;
+    setCsvMapping(next);
+    try {
+      setCsvPreview(previewCsvImport(csvText, next));
+      setCsvError(null);
+    } catch {
+      setCsvPreview(null);
+      setCsvError('请为名称、账号和密码分别选择一列');
+    }
+  };
+
+  /** 批量原子创建：校验或写盘失败时不留下半批卡片。 */
   const handleCsvImport = async (): Promise<void> => {
     if (csvPreview === null || csvPreview.items.length === 0) {
       toast('没有可导入的条目');
       return;
     }
     setBusy(true);
-    let created = 0;
     try {
-      for (const item of csvPreview.items) {
-        await client.createItem(item);
-        created += 1;
-      }
+      const result = await client.importCsvItems(csvPreview.items);
+      const duplicateText = result.skipped > 0 ? `，${result.skipped} 张已存在` : '';
       const skippedText = csvPreview.skipped.length > 0 ? `，跳过 ${csvPreview.skipped.length} 行` : '';
-      toast(`已导入 ${created} 张卡片${skippedText}`);
+      toast(`已导入 ${result.inserted} 张卡片${duplicateText}${skippedText}`);
       setCsvOpen(false);
       setCsvText('');
+      setCsvHeaders([]);
+      setCsvMapping(null);
       setCsvPreview(null);
       onDataChanged();
     } catch (caught) {
-      toast(`${describeError(caught)}（已导入 ${created} 张）`);
+      toast(`${describeError(caught)}（本批次未导入）`);
     } finally {
       setBusy(false);
     }
@@ -1275,10 +1388,14 @@ export function SettingsPanel({
         <section className="flex flex-col gap-3 rounded-card border border-line bg-surface-muted p-4">
           <h3 className="text-xs font-semibold text-fg">从 CSV 迁移</h3>
           <p className="text-[11px] leading-5 text-fg-subtle">
-            从浏览器或其它密码管理器导出的 CSV 通常是明文的，导入后请尽快删除源文件。
-            预览只显示标题与账号，不会显示密码。
+            下载模板后按表头填写，再选择 CSV 预览并一键导入。支持名称、平台、账号、密码、网址、本地应用目标、分类、标签、备注。
+            内容完全相同的卡片会自动跳过，同一个文件导入两次不会产生重复卡片。
+            CSV 通常是明文的，预览不显示密码；导入后请尽快删除源文件。
           </p>
           <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => downloadTextFile('keyisland-import-template.csv', csvTemplateText(), 'text/csv;charset=utf-8')}>
+              下载 CSV 模板
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setCsvOpen((v) => !v)}>
               {csvOpen ? '收起 CSV 导入' : '导入 CSV'}
             </Button>
@@ -1307,6 +1424,44 @@ export function SettingsPanel({
                 </p>
               ) : null}
 
+              {csvMapping !== null ? (
+                <div className="grid grid-cols-1 gap-2 rounded-card border border-line bg-surface-muted p-3 sm:grid-cols-2">
+                  {([
+                    ['title', '名称', true],
+                    ['username', '账号', true],
+                    ['password', '密码', true],
+                    ['platform', '平台', false],
+                    ['url', '网址', false],
+                    ['appPath', '本地应用目标', false],
+                    ['category', '分类', false],
+                    ['tags', '标签', false],
+                    ['notes', '备注', false],
+                  ] as const).map(([field, label, required]) => (
+                    <label key={field} className="flex items-center justify-between gap-2 text-[11px] text-fg-subtle">
+                      <span>{label}{required ? ' *' : ''}</span>
+                      <select
+                        className="min-w-0 max-w-[170px] rounded border border-line-strong bg-surface px-1.5 py-1 text-[11px] text-fg"
+                        value={csvMapping[field] ?? ''}
+                        onChange={(event) => updateCsvMapping(field, event.target.value || null)}
+                      >
+                        {!required ? <option value="">不导入</option> : null}
+                        {csvHeaders.map((header, index) => {
+                          const usedByAnotherRequired = (['title', 'username', 'password'] as const).some(
+                            (requiredField) => requiredField !== field && csvMapping[requiredField] === header,
+                          );
+                          return (
+                            <option key={`${header}-${index}`} value={header} disabled={required && usedByAnotherRequired}>
+                              {header || `第 ${index + 1} 列`}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                  ))}
+                  <p className="sm:col-span-2 text-[10px] text-fg-faint">可手动修正自动识别结果；名称、账号、密码必须各自选择一列。</p>
+                </div>
+              ) : null}
+
               {csvPreview !== null ? (
                 <div className="rounded-card border border-line bg-surface-muted p-3 text-[11px] text-fg-subtle">
                   <p>
@@ -1324,6 +1479,18 @@ export function SettingsPanel({
                   ) : null}
                   {csvPreview.skipped.length > 5 ? (
                     <p className="mt-1">其余 {csvPreview.skipped.length - 5} 行同样被跳过。</p>
+                  ) : null}
+                  {csvPreview.skipped.length > 0 ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const report = ['行号,原因', ...csvPreview.skipped.map((item) => `${item.line},${item.reason}`)].join('\r\n');
+                        downloadTextFile('keyisland-csv-import-skipped.csv', `\uFEFF${report}`, 'text/csv;charset=utf-8');
+                      }}
+                    >
+                      下载跳过行报告
+                    </Button>
                   ) : null}
                   <p className="mt-1 text-fg-faint">已读取文件内容：{csvText.length} 个字符</p>
                 </div>
@@ -1351,11 +1518,14 @@ export function SettingsPanel({
           </p>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={() => { setBackupOpen((v) => !v); setImportOpen(false); }}>
-              {backupOpen ? '收起导出' : '导出备份'}
+            <Button variant="secondary" size="sm" onClick={() => { setBackupOpen((v) => !v); setImportOpen(false); setBundleOpen(false); }}>
+              {backupOpen ? '收起完整备份' : '导出完整备份'}
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => { setImportOpen((v) => !v); setBackupOpen(false); }}>
-              {importOpen ? '收起导入' : '导入备份'}
+            <Button variant="secondary" size="sm" onClick={() => { setImportOpen((v) => !v); setBackupOpen(false); setBundleOpen(false); }}>
+              {importOpen ? '收起完整恢复' : '导入完整备份'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => { setBundleOpen((v) => !v); setBackupOpen(false); setImportOpen(false); }}>
+              {bundleOpen ? '收起资产迁移' : '资产批量迁移'}
             </Button>
           </div>
 
@@ -1378,6 +1548,65 @@ export function SettingsPanel({
               <div>
                 <Button variant="primary" size="sm" loading={busy} onClick={() => void handleExportBackup()}>
                   导出 .kib 文件
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {bundleOpen ? (
+            <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3">
+              <div className="rounded border border-sky-200 bg-sky-50 p-2 text-[11px] leading-5 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200">
+                资产迁移包只包含选中的资产内容，不包含恢复密钥或原库密钥槽。导入使用导出时的主密码解密，然后用当前库重新加密并追加；原有卡片不会被覆盖。
+              </div>
+              <Field label="导出主密码" htmlFor="settings-bundle-export-password" hint="导出前会验证；目标库导入时需要同一密码">
+                <input
+                  id="settings-bundle-export-password"
+                  type="password"
+                  autoComplete="current-password"
+                  className={INPUT_CLASS}
+                  value={bundleExportPassword}
+                  onChange={(event) => setBundleExportPassword(event.target.value)}
+                />
+              </Field>
+              <Button variant="primary" size="sm" loading={busy} onClick={() => void handleExportAssetBundle()}>
+                导出加密资产包
+              </Button>
+              <Field label="导入资产包" htmlFor="settings-bundle-file" hint="选择 .kia 文件；导入只新增，完全相同的资产自动跳过">
+                <input
+                  id="settings-bundle-file"
+                  type="file"
+                  accept=".kia,application/octet-stream,application/json"
+                  className={INPUT_CLASS}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file !== undefined) {
+                      void handlePickAssetBundle(file);
+                    }
+                  }}
+                />
+              </Field>
+              <Field label="资产包主密码" htmlFor="settings-bundle-import-password">
+                <input
+                  id="settings-bundle-import-password"
+                  type="password"
+                  autoComplete="current-password"
+                  className={INPUT_CLASS}
+                  value={bundleImportPassword}
+                  onChange={(event) => setBundleImportPassword(event.target.value)}
+                />
+              </Field>
+              {bundlePreviewError !== null ? <p role="alert" className="text-[11px] text-red-600 dark:text-red-400">{bundlePreviewError}</p> : null}
+              {bundlePreview !== null ? (
+                <div className="rounded border border-line bg-surface-muted p-2 text-[11px] text-fg-subtle">
+                  文件包含 <span className="font-semibold text-fg">{bundlePreview.total}</span> 张资产，预计新增 <span className="font-semibold text-emerald-700 dark:text-emerald-300">{bundlePreview.inserted}</span> 张，跳过完全相同的 <span className="font-semibold text-fg">{bundlePreview.skipped}</span> 张。
+                </div>
+              ) : null}
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="secondary" size="sm" loading={busy} disabled={bundleImportText.length === 0 || bundleImportPassword.length === 0} onClick={() => void handlePreviewAssetBundle()}>
+                  预览导入结果
+                </Button>
+                <Button variant="primary" size="sm" loading={busy} disabled={bundlePreview === null || bundlePreview.inserted === 0} onClick={() => void handleImportAssetBundle()}>
+                  确认增量导入
                 </Button>
               </div>
             </div>

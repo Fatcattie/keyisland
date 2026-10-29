@@ -3,22 +3,49 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>密岛 KeyIsland · 使用指南</title>
+<title>密岛 KeyIsland · 操作指引与功能说明</title>
 <style>
   :root {
-    --bg: #fafafa;
-    --panel: #ffffff;
-    --ink: #18181b;
-    --muted: #71717a;
-    --line: #e4e4e7;
-    --brand: #1e3a8a;
-    --amber: #f59e0b;
-    --amber-soft: #fef3c7;
-    --danger: #dc2626;
-    --danger-soft: #fee2e2;
-    --ok: #059669;
-    --ok-soft: #ecfdf5;
-    --code-bg: #0b0b0d;
+    --ki-night: #1e3a8a;
+    --ki-night-2: #16203a;
+    --ki-night-3: #0b0b0d;
+    --ki-amber: #fbbf24;
+    --ki-amber-soft: #fde68a;
+    --ki-teal: #0e7490;
+    --ki-teal-soft: #5eead4;
+
+    --bg: #ffffff;
+    --surface: #f7f8fa;
+    --surface-2: #eef1f5;
+    --border: #e3e7ec;
+    --text: #1c2430;
+    --text-muted: #5a6675;
+    --text-subtle: #8a93a3;
+    --accent: var(--ki-night);
+    --accent-2: var(--ki-teal);
+    --code-bg: #f1f3f7;
+    --warn-bg: #fff7e6;
+    --warn-border: #f6d98a;
+    --warn-text: #8a5a00;
+    --shadow: 0 1px 3px rgba(16,30,54,.08), 0 6px 24px rgba(16,30,54,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1117;
+      --surface: #161b24;
+      --surface-2: #1d2430;
+      --border: #2a3340;
+      --text: #eef2f7;
+      --text-muted: #aab4c2;
+      --text-subtle: #7b8794;
+      --accent: var(--ki-teal-soft);
+      --accent-2: var(--ki-amber-soft);
+      --code-bg: #1a212c;
+      --warn-bg: #2a2113;
+      --warn-border: #5a4413;
+      --warn-text: #f0c674;
+      --shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.35);
+    }
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -26,410 +53,472 @@
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
     background: var(--bg);
-    color: var(--ink);
-    line-height: 1.75;
-    font-size: 15px;
+    color: var(--text);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { display: flex; max-width: 1180px; margin: 0 auto; }
-  /* 侧边目录 */
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .hero {
+    background: linear-gradient(135deg, var(--ki-night) 0%, var(--ki-night-2) 55%, var(--ki-night-3) 100%);
+    color: #fff;
+    padding: 46px 32px 40px;
+  }
+  .hero-inner { max-width: 1080px; margin: 0 auto; }
+  .hero .badge {
+    display: inline-block; font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    padding: 4px 12px; border-radius: 999px; color: var(--ki-amber-soft); margin-bottom: 16px;
+  }
+  .hero h1 { margin: 0 0 10px; font-size: 34px; font-weight: 800; letter-spacing: .5px; }
+  .hero p { margin: 0; max-width: 640px; color: #d8e0ee; font-size: 15px; }
+  .hero .tags { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero .tag {
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+    color: #eaf0f8; padding: 5px 12px; border-radius: 8px; font-size: 13px;
+  }
+
+  .layout { max-width: 1080px; margin: 0 auto; display: flex; gap: 36px; padding: 0 32px; }
   nav.toc {
     position: sticky; top: 0; align-self: flex-start;
     width: 240px; flex: 0 0 240px; height: 100vh; overflow-y: auto;
-    padding: 28px 18px; border-right: 1px solid var(--line); background: var(--panel);
+    padding: 28px 0 40px; font-size: 13.5px;
   }
-  nav.toc h2 { font-size: 12px; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin: 0 0 12px; }
-  nav.toc ol { list-style: none; margin: 0; padding: 0; }
-  nav.toc li { margin: 2px 0; }
-  nav.toc a { display: block; padding: 6px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 13.5px; }
-  nav.toc a:hover { background: #f4f4f5; color: var(--ink); }
-  main { flex: 1; padding: 40px 56px 100px; min-width: 0; }
-  header.hero {
-    background: linear-gradient(135deg, #1e3a8a 0%, #16203a 60%, #0b0b0d 100%);
-    color: #fff; border-radius: 18px; padding: 38px 36px; margin-bottom: 36px;
+  nav.toc .toc-title { font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; margin-bottom: 12px; padding-left: 14px; }
+  nav.toc a { display: block; padding: 6px 14px; color: var(--text-muted); border-left: 2px solid transparent; }
+  nav.toc a:hover { color: var(--text); text-decoration: none; background: var(--surface); }
+  nav.toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  main { flex: 1 1 auto; min-width: 0; padding: 30px 0 80px; }
+  section { scroll-margin-top: 18px; margin-bottom: 44px; }
+  h2 {
+    font-size: 23px; font-weight: 800; margin: 0 0 16px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border);
   }
-  header.hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .02em; }
-  header.hero p { margin: 0; color: #cbd5e1; font-size: 15px; }
-  header.hero .badge { display: inline-block; margin-top: 16px; background: rgba(253,230,138,.18); color: #fde68a; border: 1px solid rgba(253,230,138,.4); padding: 5px 12px; border-radius: 999px; font-size: 12.5px; }
-  section { margin-bottom: 40px; scroll-margin-top: 16px; }
-  section > h2 {
-    font-size: 22px; margin: 0 0 6px; padding-bottom: 10px; border-bottom: 2px solid var(--brand);
-  }
-  h3 { font-size: 16.5px; margin: 26px 0 8px; color: var(--brand); }
-  h4 { font-size: 14.5px; margin: 18px 0 6px; }
+  h2 .num { color: var(--accent); margin-right: 10px; }
+  h3 { font-size: 17px; font-weight: 700; margin: 26px 0 10px; }
   p { margin: 10px 0; }
   ul, ol { margin: 10px 0; padding-left: 22px; }
-  li { margin: 5px 0; }
-  code { background: #f4f4f5; padding: 1px 6px; border-radius: 5px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 13px; color: #b91c1c; }
-  .codeblock { background: var(--code-bg); color: #e5e7eb; padding: 14px 16px; border-radius: 12px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12.5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
-  .callout { border-radius: 12px; padding: 14px 18px; margin: 16px 0; font-size: 14px; }
-  .callout.warn { background: var(--amber-soft); border: 1px solid #fcd34d; color: #92400e; }
-  .callout.danger { background: var(--danger-soft); border: 1px solid #fca5a5; color: #991b1b; }
-  .callout.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
-  .callout.ok { background: var(--ok-soft); border: 1px solid #6ee7b7; color: #065f46; }
-  .callout strong { font-weight: 700; }
-  .steps { counter-reset: step; list-style: none; padding-left: 0; }
-  .steps > li { position: relative; padding: 8px 0 8px 44px; border-left: 2px solid var(--line); margin-left: 12px; }
-  .steps > li::before {
-    counter-increment: step; content: counter(step);
-    position: absolute; left: -14px; top: 8px; width: 26px; height: 26px;
-    background: var(--brand); color: #fff; border-radius: 50%; text-align: center; line-height: 26px; font-size: 13px; font-weight: 700;
+  li { margin: 6px 0; }
+  .lead { color: var(--text-muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; box-shadow: var(--shadow); border-radius: 10px; overflow: hidden; }
+  thead th { background: var(--surface-2); text-align: left; padding: 10px 14px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: var(--surface); }
+
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .callout {
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+    border-radius: 10px; padding: 14px 16px; margin: 16px 0; font-size: 14px;
   }
-  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
-  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
-  th { background: #f4f4f5; font-weight: 600; }
-  .kbd { display: inline-block; min-width: 20px; text-align: center; padding: 1px 7px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; background: #fff; font-family: monospace; font-size: 12.5px; }
-  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-  .pill.normal { background: #f4f4f5; color: #52525b; }
-  .pill.uo { background: var(--amber-soft); color: #92400e; }
-  .pill.hidden { background: var(--danger-soft); color: #991b1b; }
-  .pill.masked { background: #ede9fe; color: #5b21b6; }
-  footer { border-top: 1px solid var(--line); padding-top: 22px; color: var(--muted); font-size: 13px; }
+  .callout b { color: var(--warn-text); }
+
+  .shots { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+  .shots figure { margin: 0; flex: 1 1 280px; }
+  .shots img { width: 100%; border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); background: var(--surface); }
+  .shots figcaption { font-size: 12.5px; color: var(--text-subtle); margin-top: 6px; text-align: center; }
+
+  .kbd { display: inline-block; background: var(--surface-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; font-size: 12.5px; font-family: ui-monospace, monospace; color: var(--text); }
+
+  footer { border-top: 1px solid var(--border); color: var(--text-subtle); font-size: 13px; padding: 22px 32px; text-align: center; }
+
   @media (max-width: 860px) {
-    .wrap { flex-direction: column; }
-    nav.toc { position: static; width: auto; height: auto; border-right: none; border-bottom: 1px solid var(--line); }
-    main { padding: 28px 20px 80px; }
+    .layout { flex-direction: column; gap: 0; padding: 0 18px; }
+    nav.toc { position: static; width: auto; flex: none; height: auto; padding: 18px 0 0; border-bottom: 1px solid var(--border); }
+    nav.toc a { display: inline-block; border-left: none; }
+    main { padding-top: 22px; }
+    .hero { padding: 34px 18px 30px; }
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <nav class="toc">
-    <h2>目录</h2>
-    <ol>
-      <li><a href="#welcome">1. 欢迎使用密岛</a></li>
-      <li><a href="#install">2. 安装与首次启动</a></li>
-      <li><a href="#setup">3. 创建你的保险库</a></li>
-      <li><a href="#main">4. 主面板与日常使用</a></li>
-      <li><a href="#item">5. 新建 / 编辑一张密码卡片</a></li>
-      <li><a href="#island">6. 灵动岛与后台常驻</a></li>
-      <li><a href="#lock">7. 锁定、解锁与自动上锁</a></li>
-      <li><a href="#privacy">8. 四种隐私档位</a></li>
-      <li><a href="#recover">9. 忘记主密码？用恢复码找回</a></li>
-      <li><a href="#backup">10. 加密备份与恢复</a></li>
-      <li><a href="#settings">11. 设置说明</a></li>
-      <li><a href="#safety">12. 安全须知与常见疑问</a></li>
-      <li><a href="#trouble">13. 启动失败怎么办</a></li>
-    </ol>
-  </nav>
-
-  <main>
-    <header class="hero">
-      <h1>密岛 KeyIsland · 使用指南</h1>
-      <p>本地加密的密码保险库 —— 无云端、无服务器、无后门。本指南面向普通用户，帮你完成安装、建库、存取代号、备份与恢复。</p>
-      <span class="badge">本地加密 · 无云端连接 · 数据只属于你</span>
-    </header>
-
-    <section id="welcome">
-      <h2>1. 欢迎使用密岛</h2>
-      <p>密岛是一款把你的账号密码<strong>只保存在你自己电脑上</strong>的密码管理器。它和大多数"账号密码同步到厂商服务器"的工具不同：</p>
-      <ul>
-        <li><strong>没有云端账户。</strong>你不需要注册、不需要邮箱、不需要联网。</li>
-        <li><strong>没有后门。</strong>所有数据用你的主密码在本地加密，开发者也无法打开。</li>
-        <li><strong>没有网络请求。</strong>程序运行时不与任何服务器通信（详见第 11、12 节）。</li>
-      </ul>
-      <div class="callout info">
-        <strong>一句话安全模型：</strong>主密码 + 恢复码，是打开保险库仅有的两把钥匙。两把都丢，谁也救不了你的数据——包括密岛自己。
+  <header class="hero">
+    <div class="hero-inner">
+      <span class="badge">KeyIsland · 终端用户手册</span>
+      <h1>密岛 · 操作指引与功能说明</h1>
+      <p>本地加密的密码保险库 —— 无云端、无服务器、无后门。本手册讲清每个功能是什么、怎么一步步用。适用版本 v0.1.8。</p>
+      <div class="tags">
+        <span class="tag">本地优先</span>
+        <span class="tag">SQLCipher 加密</span>
+        <span class="tag">白天 / 黑夜主题</span>
+        <span class="tag">灵动岛常驻</span>
+        <span class="tag">Windows 10 / 11</span>
       </div>
-    </section>
+    </div>
+  </header>
 
-    <section id="install">
-      <h2>2. 安装与首次启动</h2>
-      <h3>安装</h3>
-      <ol class="steps">
-        <li>双击安装包（文件名类似 <code>KeyIsland_x.x.x_x64-setup.exe</code>）。</li>
-        <li>安装为<strong>当前用户级</strong>（不需要管理员权限），默认装在你的用户目录下。</li>
-        <li>安装完成后，从开始菜单或桌面快捷方式启动密岛。</li>
-      </ol>
-      <div class="callout warn">
-        如果你的电脑装有安全软件，首次启动可能被拦截。请把密岛加入白名单，否则可能表现为"图标一闪而过"（见第 13 节）。
-      </div>
-      <h3>首次启动</h3>
-      <p>第一次打开会直接进入<strong>设置向导</strong>，引导你创建保险库。跟着向导走完三步即可（见下一节）。</p>
-      <div class="callout info">
-        <strong>关于"网页版"：</strong>密岛主要形态是这里安装的<strong>桌面程序</strong>。若你是通过浏览器打开的某个预览页面，那里的数据<strong>只留在内存、重启即清空</strong>，仅作功能演示；只有安装桌面版，密码才会真正落盘保存。
-      </div>
-    </section>
+  <div class="layout">
+    <nav class="toc">
+      <div class="toc-title">目录</div>
+      <a href="#s1">1. 关于本手册</a>
+      <a href="#s2">2. 产品简介与安全模型</a>
+      <a href="#s3">3. 安装与首次启动</a>
+      <a href="#s4">4. 创建你的保险库</a>
+      <a href="#s5">5. 主面板布局与日常使用</a>
+      <a href="#s6">6. 白天 / 黑夜主题</a>
+      <a href="#s7">7. 新建 / 编辑卡片</a>
+      <a href="#s8">8. 灵动岛与后台常驻</a>
+      <a href="#s9">9. 锁定 / 解锁 / 自动上锁</a>
+      <a href="#s10">10. 四种隐私档位</a>
+      <a href="#s11">11. 忘记主密码？找回</a>
+      <a href="#s12">12. 从 CSV 快速导入</a>
+      <a href="#s13">13. 批量资产导出与导入</a>
+      <a href="#s14">14. 加密备份与恢复</a>
+      <a href="#s15">15. 设置说明</a>
+      <a href="#s16">16. 快捷键与高效操作一览</a>
+      <a href="#s17">17. 安全须知与常见疑问</a>
+      <a href="#s18">18. 启动失败怎么办</a>
+    </nav>
 
-    <section id="setup">
-      <h2>3. 创建你的保险库</h2>
-      <p>设置向导分三步，全程在本地完成，请认真看完每一步的提示。</p>
-
-      <h3>第 1 步 · 设置主密码</h3>
-      <ul>
-        <li><strong>要求：至少 8 位，且包含以下四类字符中的至少两类</strong>——小写字母、大写字母、数字、符号。</li>
-        <li>输入框下方有<strong>实时强度条</strong>，会随你输入变化（弱 / 中 / 强）。</li>
-      </ul>
-      <div class="callout danger">
-        <strong>主密码是你打开保险库的唯一钥匙之一。</strong>它无法找回、无法重置（除非你持有恢复码）。请使用一个你记得住、别人猜不到的密码。
-      </div>
-
-      <h3>第 2 步 · 密码提示（可选）</h3>
-      <p>可以写一句只有你自己懂的提示，万一某天想不起主密码，解锁时能看到它。<strong>提示不能包含密码本身</strong>，留空也可以。</p>
-
-      <h3>第 3 步 · 保存恢复码（最关键的一步）</h3>
-      <p>密岛会生成一串 <strong>32 位恢复码</strong>（形如 <code>XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</code>，8 组 4 位）。这一屏给你三件事：</p>
-      <ul>
-        <li><strong>复制恢复码</strong>——点到剪贴板。</li>
-        <li><strong>下载 <code>.kirk</code> 文件</strong>——把恢复密钥存成一个文件。</li>
-        <li><strong>勾选「我已离线保存」</strong>——只有勾选后，才能点「进入密岛」。</li>
-      </ul>
-      <div class="callout danger">
-        <strong>请务必把恢复码写在纸上、或存进 U 盘等离线位置，不要只留在电脑里。</strong><br />
-        一旦「恢复码丢失」<strong>且</strong>「主密码也忘了」，你的数据将<strong>永久不可恢复</strong>——密岛没有服务器，也没有任何后门能帮你打开。
-      </div>
-    </section>
-
-    <section id="main">
-      <h2>4. 主面板与日常使用</h2>
-      <p>进入保险库后，你会看到主面板。它分为三块：</p>
-      <ul>
-        <li><strong>左侧导航</strong>：全部 / 收藏 / 分类 / 标签 / 隐藏卡片。</li>
-        <li><strong>顶部工具条</strong>：搜索、网格⇄列表切换、排序、选择（批量）、预览灵动岛、锁定、新建卡片。</li>
-        <li><strong>卡片网格</strong>：每张卡片是一个账号密码条目。</li>
-      </ul>
-
-      <h3>搜索</h3>
-      <p>按键盘 <span class="kbd">/</span> 键即可聚焦搜索框，输入标题、账号、平台或网址即可筛选。</p>
-
-      <h3>卡片上能做什么</h3>
-      <table>
-        <thead><tr><th>操作</th><th>怎么用</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td>收藏</td><td>点卡片上的☆</td><td>标星后可在左侧「收藏」里快速找到。</td></tr>
-          <tr><td>复制账号 / 密码</td><td>点卡片上的复制图标</td><td>复制后默认 <strong>30 秒自动清空剪贴板</strong>（可在设置关闭或调整）。</td></tr>
-          <tr><td>预览密码</td><td><strong>按住</strong>眼睛图标</td><td>按住才显示明文，松开、移开或切走立刻隐藏——避免在屏幕上长时间暴露。</td></tr>
-          <tr><td>打开链接</td><td>点外链图标</td><td>卡片配了网址就直接打开；同时配了本地应用会弹出二选一菜单；仅配本地应用的，桌面版会启动该程序。</td></tr>
-          <tr><td>编辑 / 删除</td><td>点铅笔 / 垃圾桶图标</td><td>编辑会展示明文密码；删除需确认。</td></tr>
-        </tbody>
-      </table>
-      <p>每张卡片右下角有三个小圆点表示<strong>密码强度</strong>（红=弱，黄=中，绿=强），无需解密即可显示，方便你一眼发现弱密码。</p>
-
-      <h3>批量操作</h3>
-      <p>点工具条的「选择」进入选择模式，勾选多张卡片后可<strong>批量删除</strong>。出于安全，批量删除需要<strong>重新输入一次主密码</strong>。</p>
-
-      <h3>状态条</h3>
-      <p>主面板底部常驻两行：左侧是「<strong>本地加密 · 无云端连接</strong>」的安全声明，右侧是「<strong>会话剩余 X</strong>」——距离自动锁定还剩多少时间。</p>
-    </section>
-
-    <section id="item">
-      <h2>5. 新建 / 编辑一张密码卡片</h2>
-      <p>点工具条「新建卡片」（或卡片上的铅笔）打开编辑器。可填写的字段如下：</p>
-      <table>
-        <thead><tr><th>字段</th><th>是否必填</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td>标题</td><td>必填</td><td>给这条记录起个名字，如"GitHub"。</td></tr>
-          <tr><td>平台</td><td>可选</td><td>如 GitHub、网易云。会显示在卡片副标题。</td></tr>
-          <tr><td>账号</td><td>必填</td><td>用户名 / 手机号 / 邮箱。</td></tr>
-          <tr><td>密码</td><td>新建必填</td><td>编辑时留空表示"不修改原密码"。</td></tr>
-          <tr><td>网址</td><td>可选</td><td>填了之后卡片上的外链图标才能打开网站。</td></tr>
-          <tr><td>本地应用目标</td><td>可选</td><td>桌面版可一键启动该软件；网页版只保存、不执行。</td></tr>
-          <tr><td>分类</td><td>可选</td><td>留空归入「其他」。预设：开发 / 工作 / 娱乐 / 社交 / 购物 / 金融 / 其他。</td></tr>
-          <tr><td>标签</td><td>可选</td><td>用逗号或顿号分隔，如 <code>工作, 常用</code>，用于左侧「标签」导航。</td></tr>
-          <tr><td>备注</td><td>可选</td><td>任意补充说明。</td></tr>
-          <tr><td>可见性</td><td>可选</td><td>见第 8 节四种隐私档位。</td></tr>
-        </tbody>
-      </table>
-
-      <h3>内置密码生成器</h3>
-      <p>编辑器里自带强密码生成器：可选长度 <strong>16 / 20 / 24 位</strong>，勾选是否包含小写、大写、数字、符号，点「生成」即用新密码填好。也可以点账号 / 密码框旁的<strong>粘贴</strong>图标，从剪贴板导入——粘贴来的密码<strong>不会自动显形</strong>，也不会写进任何提示或日志，保护你不被旁人瞄到。</p>
-    </section>
-
-    <section id="island">
-      <h2>6. 灵动岛与后台常驻</h2>
-      <p><strong>灵动岛是密岛的常驻小组件</strong>：建库并解锁后，你不用每次都打开大窗口，直接就能在灵
-      动岛上<strong>搜索、看最近使用、快捷建卡、复制账号/密码、跳转</strong>——它是真正可用的，而
-      不是只能看。</p>
-
-      <h3>把主面板"收进"灵动岛（留在后台）</h3>
-      <p>在完整主面板里，点窗口的<strong>关闭（×）或最小化（—）</strong>，密岛不会退出，而是：</p>
-      <ol class="steps">
-        <li>主面板缩成一个<strong>无边框、置顶的小岛</strong>贴在屏幕顶部（默认收起成一条，点一下展开）；</li>
-        <li>同时缩到<strong>系统托盘</strong>（任务栏不再显示密岛）。</li>
-      </ol>
-      <p>这样密岛继续在后台运行，灵动岛始终可见、随时可点。首次"收进岛"会有一条轻提示告诉你如何彻底退出。</p>
-
-      <h3>右键灵动岛，唤醒主面板</h3>
-      <p>在灵动岛上<strong>点右键</strong>会弹出小菜单，三项：</p>
-      <table>
-        <thead><tr><th>菜单项</th><th>作用</th></tr></thead>
-        <tbody>
-          <tr><td>打开主面板</td><td>把小岛还原成完整窗口（也可点托盘图标）。</td></tr>
-          <tr><td>锁定保险库</td><td>立即锁定；已锁定时置灰（不摆假按钮）。</td></tr>
-          <tr><td>退出密岛</td><td>真正退出进程（退出前会先清空剪贴板与计时器）。</td></tr>
-        </tbody>
-      </table>
-      <p>托盘图标左键 = 打开主面板；右键托盘菜单同样有「打开主面板 / 锁定保险库 / 退出密岛」。</p>
-
-      <div class="callout warn">
-        <strong>关闭 ≠ 退出。</strong>「关闭 / 最小化主面板」只是把密岛收进灵动岛与托盘，数据与会话仍在
-        后台。要彻底退出，请从<strong>右键灵动岛 → 退出密岛</strong>，或托盘菜单退出。
-      </div>
-
-      <h3>主面板里也有灵动岛预览条</h3>
-      <p>当你打开完整主面板时，顶部工具条仍带一个<strong>可收缩的灵动岛预览条</strong>：点一下展开，同样能搜
-      索、建卡、复制——这是在主窗口内随手用的快捷入口，与"收进后台的小岛"是同一个功能的两处形态。</p>
-
-      <div class="callout info">
-        灵动岛是<strong>桌面版专属</strong>能力。若你使用的是网页预览，相关本地操作（如启动应用、收进后台）
-        不会执行，只会提示"桌面版将启动本地应用"。
-      </div>
-    </section>
-
-    <section id="lock">
-      <h2>7. 锁定、解锁与自动上锁</h2>
-      <h3>自动锁定</h3>
-      <p>出于安全，密岛会在你一段时间不操作后<strong>自动上锁</strong>。默认策略是<strong>闲置 30 分钟</strong>。此外，当窗口切到后台、或系统锁屏 / 休眠时，也会立即上锁（这一项可在设置中关闭）。</p>
-      <p>你也可以在工具条随时点「锁定」<strong>手动上锁</strong>。</p>
-
-      <h3>解锁</h3>
-      <ol class="steps">
-        <li>在解锁页输入<strong>主密码</strong>。</li>
-        <li>连续输错 <strong>2 次</strong>后，会出现「显示提示」按钮——点它可以看你在建库时写的密码提示。</li>
-        <li>继续输错会进入<strong>冷却倒计时</strong>，期间提交被禁用，倒计时结束才能再试。</li>
-        <li>若彻底想不起主密码，点「忘记密码？」走恢复流程（见第 9 节）。</li>
-      </ol>
-      <p>每次锁定都会显示<strong>原因</strong>，例如"你刚刚手动锁定""超过自动锁定时间""系统锁屏或切到后台"等，让你清楚为什么被锁。</p>
-    </section>
-
-    <section id="privacy">
-      <h2>8. 四种隐私档位</h2>
-      <p>每张卡片都可以设置"可见性"，控制它在列表里暴露多少：</p>
-      <table>
-        <thead><tr><th>档位</th><th>含义</th></tr></thead>
-        <tbody>
-          <tr><td><span class="pill normal">普通</span></td><td>账号与密码都可查看、可复制。默认档位。</td></tr>
-          <tr><td><span class="pill uo">仅账号</span></td><td>列表显示账号，密码<strong>只能复制、不可预览</strong>（预览按钮被禁用）。</td></tr>
-          <tr><td><span class="pill hidden">隐藏</span></td><td><strong>不进入列表与搜索</strong>，必须二次验证主密码才能看到。适合高度敏感的条目。</td></tr>
-          <tr><td><span class="pill masked">遮罩</span></td><td>留在列表里，但账号与密码<strong>用圆点遮住</strong>，验证主密码后才显示。适合"在别人面前打开密岛"的场景。</td></tr>
-        </tbody>
-      </table>
-
-      <h3>访问隐藏 / 遮罩卡片</h3>
-      <ul>
-        <li>点左侧「<strong>隐藏卡片</strong>」会弹出验证框，要求再输一次主密码。验证通过后<strong>授权窗口为 120 秒</strong>，到期自动退出隐藏视图并提示你。</li>
-        <li>「遮罩」卡片在列表里点开时，也会先要求验证主密码，验证通过才临时显示字段；到期后自动恢复遮罩。</li>
-        <li>输错主密码时，会提示<strong>剩余可试次数</strong>，防止暴力猜测。</li>
-      </ul>
-      <div class="callout warn">
-        把卡片设为「隐藏」或「遮罩」只是<strong>额外的一层本地保护</strong>，并不能替代主密码。它防止的是"别人已经能开你电脑、且你已解锁"时的窥探。
-      </div>
-    </section>
-
-    <section id="recover">
-      <h2>9. 忘记主密码？用恢复码找回</h2>
-      <p>如果你还记得<strong>恢复码</strong>（或保存的 <code>.kirk</code> 文件），就能重设主密码、拿回数据。</p>
-      <ol class="steps">
-        <li>在解锁页点「忘记密码？」，进入恢复流程。</li>
-        <li><strong>验证身份</strong>：输入 32 位恢复码（大小写和分隔符都不敏感），或选 / 粘贴 <code>.kirk</code> 文件内容。</li>
-        <li><strong>设置新主密码</strong>：输入两次一致、且强度达标的新密码。</li>
-        <li>完成后会话会回到锁定态，用<strong>新主密码</strong>重新解锁即可。</li>
-      </ol>
-      <div class="callout danger">
-        重新设密后，<strong>旧的恢复码仍然有效</strong>（除非你主动轮换，见下）。但一旦<strong>主密码和恢复密钥同时丢失</strong>，数据将永久不可恢复——密岛没有服务器，也没有后门。
-      </div>
-
-      <h3>怀疑恢复码泄露？轮换它</h3>
-      <p>在设置里可以「重新生成恢复密钥」：先验证主密码，再把旧恢复码 / 旧 <code>.kirk</code> 作废，生成一份全新的。注意：</p>
-      <ul>
-        <li>旧恢复码在生成成功的<strong>那一刻立即失效</strong>，<strong>没有过渡期</strong>。</li>
-        <li>新恢复码只在此流程内出现一次，必须<strong>重新离线保存</strong>并勾选确认才完成。</li>
-        <li>主密码不受影响；轮换后请用新 <code>.kirk</code> 做后续备份与恢复。</li>
-      </ul>
-    </section>
-
-    <section id="backup">
-      <h2>10. 加密备份与恢复</h2>
-      <p>密岛的数据只存在你这台电脑上。<strong>做一份加密备份，是防止硬盘损坏、换电脑、系统重装后数据丢失的唯一办法。</strong></p>
-
-      <h3>导出加密备份（.kib）</h3>
-      <ol class="steps">
-        <li>打开「设置」，找到备份区域，点「导出 .kib 文件」。</li>
-        <li>为这份备份<strong>设置一个备份密码</strong>（可以与主密码不同）。</li>
-        <li>浏览器会下载一个文件，命名为 <code>keyisland-YYYY-MM-DD.kib</code>。</li>
-        <li><strong>把 .kib 文件存到离线或另一处安全位置</strong>（U 盘、另一台设备）。</li>
-      </ol>
-      <div class="callout info">
-        <strong>备份文件本身就是加密的</strong>（KIB1 格式：外层只有格式信息，里面的密码、密钥槽、偏好全部 AES 加密）。备份密码<strong>不会写进文件</strong>，所以即使别人拿到 .kib，没有密码也打不开。
-      </div>
-      <div class="callout warn">
-        <strong>恢复备份需要两样东西同时具备：</strong>① 你导出时设置的<strong>备份密码</strong>；② 对应的<strong>恢复密钥（.kirk 文件或恢复码）</strong>。两者缺一不可——请分别妥善保管。
-      </div>
-
-      <h3>何时会被提醒备份</h3>
-      <p>设置里会显示「上次备份」状态。如果<strong>超过 7 天没备份</strong>，临近自动锁定或启动时会有轻提示，提醒你"该导出一份了"。</p>
-
-      <h3>从备份恢复</h3>
-      <p>在「设置 → 导入备份」里选择 <code>.kib</code> 文件（或直接粘贴内容），输入<strong>备份密码</strong>并配合<strong>.kirk / 恢复码</strong>，即可恢复。恢复有两种模式：</p>
-      <table>
-        <thead><tr><th>模式</th><th>适用</th></tr></thead>
-        <tbody>
-          <tr><td><strong>覆盖导入</strong></td><td>用备份完整替换当前保险库。换电脑、硬盘坏了时用它。</td></tr>
-          <tr><td><strong>合并</strong></td><td>只把备份里"当前库没有"的条目补进来；相同内容自动跳过，冲突项保留当前版本。仅当备份与当前库来自同一把密钥时才允许合并。</td></tr>
-        </tbody>
-      </table>
-      <p>导入完成后，会话会回到锁定态，用主密码重新解锁即可看到恢复回来的数据。</p>
-    </section>
-
-    <section id="settings">
-      <h2>11. 设置说明</h2>
-      <table>
-        <thead><tr><th>设置项</th><th>说明</th></tr></thead>
-        <tbody>
-          <tr><td>自动锁定档位</td><td>可选：立即 / 5 分钟 / 30 分钟（默认）/ 4 小时 / 开机后。控制闲置多久自动上锁。</td></tr>
-          <tr><td>剪贴板自动清空</td><td>复制账号或密码后，默认 <strong>30 秒</strong>自动清空剪贴板；可关闭或调整，关闭后复制内容会一直留在剪贴板。</td></tr>
-          <tr><td>防截屏</td><td>桌面版<strong>默认开启</strong>（系统级排除截屏）；网页版不具备此能力，该项会置灰说明。</td></tr>
-          <tr><td>检查更新</td><td><strong>当前版本不发起任何网络请求</strong>。该项在网页版中置灰；桌面版默认开启，但现阶段未启用联网检查——密岛不会偷偷上网。</td></tr>
-          <tr><td>数据文件位置</td><td>显示保险库文件 <code>vault.db</code> 的路径（默认在 <code>AppData\Roaming\KeyIsland</code>），并可一键"打开所在文件夹"。网页版会显示"内存存储（未落盘）"。</td></tr>
-          <tr><td>操作日志 / 审计</td><td>记录复制、跳转、备份、恢复等关键动作（跳转只记网站域名，不记 URL 里的令牌）。</td></tr>
-          <tr><td>上次备份</td><td>显示距离上次导出 .kib 过了几天，超 7 天会提醒。</td></tr>
-        </tbody>
-      </table>
-    </section>
-
-    <section id="safety">
-      <h2>12. 安全须知与常见疑问</h2>
-      <div class="callout ok"><strong>密岛到底把数据存在哪？</strong> 只存在你电脑的 <code>vault.db</code> 里，并且：
-        <ul style="margin:8px 0 0">
-          <li>主密码经 Argon2id 派生密钥，所有条目用 AES-256-GCM 逐条独立加密；</li>
-          <li>解开数据库的密钥放在 <strong>Windows 凭据管理器</strong>（绑定当前 Windows 用户）；</li>
-          <li>不联网、不同步、不上传。</li>
+    <main>
+      <section id="s1">
+        <h2><span class="num">1</span>关于本手册</h2>
+        <p class="lead">这是一份面向使用者的手册：讲清楚「每个功能是什么」和「一步步怎么用」。</p>
+        <ul>
+          <li>想看工程结构、构建与发版流程，请移步仓库根 <a href="../../README.md">README.md</a> 与 <a href="../README.md">app/README.md</a>。</li>
+          <li>密岛是<b>桌面程序</b>（Windows 10 / 11，x64，需 WebView2 运行时）。通过浏览器打开的预览页只是演示，<b>数据只留内存、重启即清空，禁止放真实数据</b>。</li>
         </ul>
-      </div>
+      </section>
 
-      <h3>常见疑问</h3>
-      <h4>Q：换台电脑 / 重装系统后还能打开吗？</h4>
-      <p>A：数据库密钥绑定创建保险库时的那个 Windows 用户。换用户或重装系统后，凭据管理器里的密钥会丢失——这时数据文件还在但打不开。两种解法：① 换回原来的 Windows 用户；② 用之前的 <strong>.kib 加密备份"覆盖导入"</strong>。所以<strong>备份一定要做</strong>。</p>
+      <section id="s2">
+        <h2><span class="num">2</span>产品简介与安全模型</h2>
+        <p>密岛把账号密码<b>只保存在你自己电脑上</b>，与「账号密码同步到厂商服务器」的工具不同：</p>
+        <ul>
+          <li><b>没有云端账户</b>：无需注册、邮箱或联网。</li>
+          <li><b>没有后门</b>：数据用你的主密码在本地加密，开发者也无法打开。</li>
+          <li><b>没有网络请求</b>：运行时不与任何服务器通信（「检查更新」默认是关闭的显式开关，且当前未接入）。</li>
+        </ul>
+        <div class="callout"><b>一句话安全模型：</b>主密码 + 恢复码，是打开保险库仅有的两把钥匙。两把都丢，谁也救不了你的数据——包括密岛自己。</div>
+        <p>数据落盘方式：主密码经 Argon2id 派生密钥，条目以 SQLCipher（AES-256-GCM）逐条独立加密；解开库的密钥放在 <b>Windows 凭据管理器</b>（绑定当前用户）。不联网、不同步、不上传。</p>
+      </section>
 
-      <h4>Q：可以把数据文件夹放进 OneDrive / 坚果云同步吗？</h4>
-      <p>A：<strong>不建议。</strong>同步盘可能在密岛运行时锁住 <code>vault.db</code>，导致打不开（见第 13 节）。备份的 .kib 文件可以放进同步盘，但那是一个独立、已加密的文件，更合适。</p>
+      <section id="s3">
+        <h2><span class="num">3</span>安装与首次启动</h2>
+        <h3>3.1 两种发行文件</h3>
+        <p>到 <a href="https://github.com/Fatcattie/keyisland/releases/latest">Releases</a> 拿最新版：</p>
+        <table>
+          <thead><tr><th>文件</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>KeyIsland_&lt;版本&gt;_x64-setup.exe</code></td><td>安装包。装到 <code>%LOCALAPPDATA%\KeyIsland</code>，带开始菜单与卸载项（不需要管理员权限）。</td></tr>
+            <tr><td><code>keyisland.exe</code></td><td>免安装单文件，双击即用（不写注册表、不建开始菜单）。</td></tr>
+          </tbody>
+        </table>
+        <h3>3.2 关于「未签名」提示</h3>
+        <p>安装包<b>没有做代码签名</b>，首次运行 Windows SmartScreen 会提示「未知发布者」——点「更多信息」→「仍要运行」。想省掉这个提示只能去买签名证书。若安全软件拦截，请把密岛加入白名单，否则可能「图标一闪而过」（见第 16 节）。</p>
+        <h3>3.3 首次启动向导</h3>
+        <p>第一次打开进入<b>设置向导</b>，引导你创建保险库（见下一节）。</p>
+      </section>
 
-      <h4>Q：密岛会偷偷联网吗？</h4>
-      <p>A：<strong>不会。</strong>程序本身不含任何网络请求；"检查更新"在当前版本也未启用联网。</p>
+      <section id="s4">
+        <h2><span class="num">4</span>创建你的保险库</h2>
+        <p>向导分三步：</p>
+        <h3>第 1 步 · 设置主密码</h3>
+        <ul>
+          <li><b>要求：至少 8 位，且包含以下四类中的至少两类</b>：小写字母、大写字母、数字、符号。</li>
+          <li>下方有<b>实时强度条</b>（弱 / 中 / 强）。</li>
+        </ul>
+        <div class="callout"><b>主密码</b>是打开保险库的唯一钥匙之一，无法找回、无法重置（除非持有恢复码）。</div>
+        <h3>第 2 步 · 密码提示（可选）</h3>
+        <p>写一句只有你自己懂的提示，解锁时能看到。<b>提示不能含密码本身</b>，留空也可。</p>
+        <h3>第 3 步 · 保存恢复码（最关键）</h3>
+        <p>密岛生成一串 <b>32 位恢复码</b>（形如 <code>XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX</code>）。这一屏给你三件事：</p>
+        <ul>
+          <li><b>复制恢复码</b>；</li>
+          <li><b>下载 <code>.kirk</code> 文件</b>；</li>
+          <li><b>勾选「我已离线保存」</b>才能点「进入密岛」。</li>
+        </ul>
+        <div class="callout"><b>务必离线保存</b>（纸或 U 盘），不要只留电脑里。一旦「恢复码丢失」<b>且</b>「主密码忘了」，数据<b>永久不可恢复</b>。</div>
+      </section>
 
-      <h4>Q：主密码和恢复码哪个更重要？</h4>
-      <p>A：<strong>同样重要。</strong>忘主密码可用恢复码找回；但两者都丢就无解。请分别、离线保存。</p>
-    </section>
+      <section id="s5">
+        <h2><span class="num">5</span>主面板布局与日常使用</h2>
+        <p>主面板三块：<b>左侧导航</b>（全部 / 收藏 / 分类 / 标签 / 隐藏卡片）、<b>顶部工具条</b>（搜索、网格⇄列表、排序、选择、预览灵动岛、锁定、新建）、<b>卡片网格</b>。</p>
+        <ul>
+          <li><b>搜索</b>：按 <span class="kbd">/</span> 聚焦搜索框，输入即过滤。</li>
+          <li><b>卡片操作</b>：收藏（☆）、复制账号 / 密码（默认 30 秒自动清空剪贴板）、<b>按住</b>预览密码（松开即隐藏）、打开链接、编辑、删除。右下角三色点表示<b>密码强度</b>（红弱 / 黄中 / 绿强）。</li>
+          <li><b>批量删除</b>：选择模式勾选多张，删除需<b>重输主密码</b>。</li>
+          <li><b>状态条</b>：左侧「本地加密 · 无云端连接」，右侧「会话剩余 X」。</li>
+          <li><b>主题开关</b>：左侧导航底部有一个白天 / 黑夜切换（见第 6 节）。</li>
+        </ul>
+      </section>
 
-    <section id="trouble">
-      <h2>13. 启动失败怎么办</h2>
-      <p>如果双击图标后没有正常进入、或弹出"启动失败"页面，密岛会<strong>用中文说明原因并给出三步操作</strong>。常见几类：</p>
-      <table>
-        <thead><tr><th>现象</th><th>含义与对策</th></tr></thead>
-        <tbody>
-          <tr><td>数据还在，但解开它的密钥不在了</td><td>数据库完整，但 Windows 凭据管理器里的密钥丢了（换用户 / 重装 / 清理工具删过凭据）。对策：换回原 Windows 用户；或用加密备份"覆盖导入"；确认无法找回时把 <code>vault.db</code> 改名留档再重建。</td></tr>
-          <tr><td>无法访问 Windows 凭据管理器</td><td>读不到数据库密钥，数据本身无损。对策：确认用原用户登录；检查凭据管理器里的 KeyIsland 条目；重启后再试。</td></tr>
-          <tr><td>无法创建数据目录</td><td>磁盘空间不足、权限被策略限制或安全软件拦截。对策：清空间 / 加白名单 / 点"打开数据文件夹"确认位置可写。</td></tr>
-          <tr><td>无法打开数据库文件</td><td>另一个密岛进程占用、被同步盘锁住或文件损坏。对策：结束多余进程；暂停同步盘；先把 <code>vault.db</code> 复制留档再排查。</td></tr>
-        </tbody>
-      </table>
-      <p>启动失败页提供两个按钮：<strong>「打开数据文件夹」</strong>（直接定位到 <code>vault.db</code>）和<strong>「重试」</strong>。先把重要文件复制留档，再按提示操作，必要时带着"具体原因"反馈给开发者。</p>
-    </section>
+      <section id="s6">
+        <h2><span class="num">6</span>白天 / 黑夜主题</h2>
+        <p>密岛提供两套外观：<b>白天</b>（浅色）与<b>黑夜</b>（深色）。</p>
+        <ul>
+          <li><b>切换位置</b>：主面板<b>左侧导航最底部</b>的滑动开关（一个会「拉伸回弹」的胶囊开关：白色圆钮滑过 24px，途中压成横向椭圆再弹回）。点一下即可在白天 ⇄ 黑夜之间切换。</li>
+          <li><b>默认跟随系统</b>：首次打开时，密岛读取系统的「深色模式」偏好。系统深色 → 密岛深色；系统浅色 → 密岛浅色，<b>不用你手动选</b>。</li>
+          <li><b>一旦手动切换过，就记住你的选择</b>：你只要拨动过一次开关，偏好会落盘保存，之后系统的变化<b>不再覆盖</b>你选的主题。若想回到「跟随系统」，在系统层面改回对应外观即可（手动选择后即以你的选择为准）。</li>
+          <li><b>灵动岛恒为深色</b>：灵动岛（桌面常驻小岛）是独立的高对比度形态，<b>不参与主题切换</b>，始终深色，保证贴边常驻时清晰可读。</li>
+        </ul>
+        <div class="callout">主题只改外观，不影响任何已加密的数据。</div>
+        <div class="shots">
+          <figure><img src="../../docs/screenshots/main-light.png" alt="白天主题" onerror="this.closest('figure').style.display='none'" /><figcaption>白天主题</figcaption></figure>
+          <figure><img src="../../docs/screenshots/main-dark.png" alt="黑夜主题" onerror="this.closest('figure').style.display='none'" /><figcaption>黑夜主题</figcaption></figure>
+        </div>
+      </section>
 
-    <footer>
-      <p>密岛 KeyIsland · 终端用户使用指南 &nbsp;|&nbsp; 本地加密 · 无云端连接 · 无后门</p>
-      <p>本指南所述功能均对照当前版本实现编写。若实际界面与本文略有差异，以软件内提示为准。</p>
-    </footer>
-  </main>
-</div>
+      <section id="s7">
+        <h2><span class="num">7</span>新建 / 编辑一张密码卡片</h2>
+        <table>
+          <thead><tr><th>字段</th><th>必填</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>标题</td><td>必填</td><td>记录名，如"GitHub"。</td></tr>
+            <tr><td>平台</td><td>可选</td><td>显示在卡片副标题。</td></tr>
+            <tr><td>账号</td><td>必填</td><td>用户名 / 手机号 / 邮箱。</td></tr>
+            <tr><td>密码</td><td>新建必填</td><td>编辑留空=不改。</td></tr>
+            <tr><td>网址</td><td>可选</td><td>填了外链图标才能开网站。</td></tr>
+            <tr><td>本地应用目标</td><td>可选</td><td>桌面版一键启动；网页版只保存。</td></tr>
+            <tr><td>分类</td><td>可选</td><td>留空归「其他」。预设：开发/工作/娱乐/社交/购物/金融/其他。</td></tr>
+            <tr><td>标签</td><td>可选</td><td>逗号或顿号分隔，如 <code>工作, 常用</code>。</td></tr>
+            <tr><td>备注</td><td>可选</td><td>任意说明。</td></tr>
+            <tr><td>可见性</td><td>可选</td><td>见第 10 节。</td></tr>
+          </tbody>
+        </table>
+        <p><b>内置密码生成器</b>：长度 16 / 20 / 24 位，勾选小写/大写/数字/符号后「生成」。也可粘贴账号/密码——粘贴内容<b>不自动显形、不进提示与日志</b>。</p>
+      </section>
+
+      <section id="s8">
+        <h2><span class="num">8</span>灵动岛与后台常驻</h2>
+        <p><b>灵动岛是密岛的常驻小组件</b>：建库并解锁后，你不用每次都打开大窗口，直接就能在灵动岛上<b>搜索、看最近使用、快捷建卡、复制账号/密码、跳转</b>——它是真正可用的，而不是只能看。</p>
+        <h3>8.1 把主面板"收进"灵动岛（留在后台）</h3>
+        <p>在完整主面板里，点窗口的<b>关闭（×）或最小化（—）</b>，密岛不会退出，而是：</p>
+        <ol>
+          <li>主面板缩成一个<b>无边框、置顶的小岛</b>贴在屏幕顶部（默认收起成一条，点一下展开）；</li>
+          <li>同时缩到<b>系统托盘</b>（任务栏不再显示密岛）。</li>
+        </ol>
+        <p>这样密岛继续在后台运行，灵动岛始终可见、随时可点。首次"收进岛"会有一条轻提示告诉你如何彻底退出。</p>
+        <h3>8.2 右键灵动岛，唤醒主面板</h3>
+        <p>在灵动岛上<b>点右键</b>会弹出小菜单：</p>
+        <table>
+          <thead><tr><th>菜单项</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td>打开主面板</td><td>把小岛还原成完整窗口（也可点托盘图标）。</td></tr>
+            <tr><td>锁定保险库</td><td>立即锁定；已锁定时置灰（不摆假按钮）。</td></tr>
+            <tr><td>退出密岛</td><td>真正退出进程（退出前会先清空剪贴板与计时器）。</td></tr>
+          </tbody>
+        </table>
+        <p>托盘图标左键 = 打开主面板；右键托盘菜单同样有「打开主面板 / 锁定保险库 / 退出密岛」。</p>
+        <div class="callout"><b>关闭 ≠ 退出。</b>「关闭 / 最小化主面板」只是把密岛收进灵动岛与托盘，数据与会话仍在后台。要彻底退出，请从<b>右键灵动岛 → 退出密岛</b>，或托盘菜单退出。</div>
+        <h3>8.3 主面板里也有灵动岛预览条</h3>
+        <p>当你打开完整主面板时，顶部工具条仍带一个<b>可收缩的灵动岛预览条</b>：点一下展开，同样能搜索、建卡、复制——这是在主窗口内随手用的快捷入口，与"收进后台的小岛"是同一个功能的两处形态。</p>
+        <div class="callout">灵动岛是<b>桌面版专属</b>能力。若你使用的是网页预览，相关本地操作（如启动应用、收进后台）不会执行，只会提示"桌面版将启动本地应用"。</div>
+        <h3>8.4 滚轮「滑动线」选择器（快速复制）</h3>
+        <p>展开灵动岛后，在岛上<b>滚动鼠标滚轮</b>会唤出一条「滑动线」选择器，专门用来在不打开大窗口的情况下快速翻卡并复制：</p>
+        <table>
+          <thead><tr><th>操作</th><th>效果</th></tr></thead>
+          <tbody>
+            <tr><td>滚轮<b>向下</b></td><td>从<b>第一张</b>卡片开始，逐张往下翻</td></tr>
+            <tr><td>滚轮<b>向上</b></td><td>从<b>最后一张</b>卡片开始，逐张往上翻</td></tr>
+            <tr><td><span class="kbd">Enter</span></td><td>复制当前选中卡片的<b>密码</b></td></tr>
+            <tr><td><span class="kbd">Shift</span> + <span class="kbd">Enter</span></td><td>复制当前选中卡片的<b>账号</b></td></tr>
+            <tr><td><b>鼠标中键（按下滚轮）</b></td><td>退出滑动线，回到灵动岛面板（见下）</td></tr>
+            <tr><td><span class="kbd">Esc</span></td><td>关闭滑动线，但<b>不收起</b>整个岛</td></tr>
+          </tbody>
+        </table>
+        <div class="callout"><b>中键退出</b>是为「滚轮操作流」补的一个出口：滑动线打开时，按一下鼠标中键（滚轮键）就能退出选择、回到灵动岛面板，不必把鼠标挪到别处或连按 Esc。只有中键生效，左键不会误关。</div>
+      </section>
+
+      <section id="s9">
+        <h2><span class="num">9</span>锁定 / 解锁 / 自动上锁</h2>
+        <ul>
+          <li><b>自动锁定</b>：默认<b>闲置 30 分钟</b>；切后台或系统锁屏/休眠也会立即上锁（可在设置关闭）。</li>
+          <li><b>手动锁定</b>：工具条点「锁定」。</li>
+          <li><b>解锁</b>：输主密码；连错 <b>2 次</b>后出现「显示提示」；继续错进入<b>冷却倒计时</b>（期间禁用提交）；想不起密码点「忘记密码？」走恢复流程。</li>
+          <li>每次锁定显示<b>原因</b>（手动 / 超时 / 系统锁屏或切后台等）。</li>
+        </ul>
+      </section>
+
+      <section id="s10">
+        <h2><span class="num">10</span>四种隐私档位</h2>
+        <table>
+          <thead><tr><th>档位</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>普通</td><td>账号密码都可看可复制（默认）。</td></tr>
+            <tr><td>仅账号</td><td>列表显示账号，密码<b>只能复制不可预览</b>（预览禁用）。</td></tr>
+            <tr><td>隐藏</td><td><b>不进列表与搜索</b>，需二次验证主密码才能访问。</td></tr>
+            <tr><td>遮罩</td><td>留列表但账号密码<b>圆点遮住</b>，验证主密码后才显示。</td></tr>
+          </tbody>
+        </table>
+        <ul>
+          <li>点「隐藏卡片」弹验证框，再输主密码；<b>授权窗口 120 秒</b>，到期自动退出并提示。</li>
+          <li>「遮罩」卡片点开也先验证，通过后临时显示，到期恢复。</li>
+          <li>输错主密码提示<b>剩余可试次数</b>。</li>
+        </ul>
+        <div class="callout">隐藏/遮罩只是<b>额外一层本地保护</b>，不能替代主密码。</div>
+      </section>
+
+      <section id="s11">
+        <h2><span class="num">11</span>忘记主密码？用恢复码找回</h2>
+        <ol>
+          <li>解锁页点「忘记密码？」。</li>
+          <li><b>验证身份</b>：输入 32 位恢复码（大小写/分隔符不敏感），或选/粘贴 <code>.kirk</code> 内容。</li>
+          <li><b>设置新主密码</b>：两次一致且强度达标。</li>
+          <li>完成后回到锁定态，用新主密码解锁。</li>
+        </ol>
+        <div class="callout">重设后旧恢复码仍有效（除非主动轮换）。<b>主密码+恢复密钥同时丢失 = 永久不可恢复</b>。</div>
+        <p><b>轮换恢复密钥</b>（怀疑泄露时）：设置里「重新生成恢复密钥」→ 先验主密码 → 旧码立即失效（无过渡期）→ 新码只出现一次，需重新离线保存并勾选确认。主密码不受影响。</p>
+      </section>
+
+      <section id="s12">
+        <h2><span class="num">12</span>从 CSV 快速导入</h2>
+        <p>CSV 导入适合把浏览器或其他密码工具导出的账号密码表格转换为密岛资产卡片。CSV 通常是明文文件，请只在可信设备上处理，并在导入确认后按你的安全策略删除临时文件。</p>
+        <ol>
+          <li>在设置 → 备份与恢复 →「从 CSV 迁移」点击「下载 CSV 模板」。模板包含名称、平台、账号、密码、网址、本地应用目标、分类、标签、备注表头，不含示例密码。</li>
+          <li>用表格软件填写并另存为 CSV。<b>名称、账号、密码为必填列</b>；其他字段可留空。标签可用逗号、分号或顿号分隔。</li>
+          <li>点击「导入 CSV」并选择文件。密岛会按中英文表头自动识别字段，并预览可导入条目数与跳过行数；预览不会显示密码。</li>
+          <li>如果识别不正确，在「字段映射」中手动选择各字段对应列。名称、账号、密码必须分别映射到不同列；其他字段可设为「不导入」。调整后预览会同步更新。</li>
+          <li>检查预览后点击「导入」生成资产卡片。无法导入的行会显示行号和原因；跳过行报告不含账号或密码，可下载后用于修正源文件。</li>
+        </ol>
+        <ul>
+          <li><b>只新增，不覆盖</b>：导入只会追加卡片，不会修改或删除已有卡片。</li>
+          <li><b>重复自动跳过</b>：内容完全相同的卡片会被跳过，同一个 CSV 导入两次不会产生重复卡片；字段有任何差异则作为新卡片保留。</li>
+          <li>导入成功的提示会如实汇报新增数与跳过数，例如「已导入 8 张卡片，2 张已存在」。</li>
+        </ul>
+        <div class="callout">请检查 CSV 的来源与内容。不要通过不可信渠道传输含真实密码的 CSV，也不要把它当作加密备份。</div>
+      </section>
+
+      <section id="s13">
+        <h2><span class="num">13</span>批量资产导出与导入</h2>
+        <p>这项功能用于在<b>不同保险库之间迁移卡片</b>，与完整库备份不同。它只包含资产内容，不包含源库的密钥槽、恢复码、库设置或原始卡片 ID；导入时使用当前库密钥重新加密。</p>
+        <h3>导出加密资产包（.kia）</h3>
+        <ol>
+          <li>在已解锁的主面板打开「设置」→「备份与恢复」→「资产批量迁移」。</li>
+          <li>输入<b>当前库主密码</b>。密岛会先验证密码，再生成加密资产包。</li>
+          <li>保存 <code>keyisland-assets-YYYY-MM-DD.kia</code> 文件，并通过你信任的渠道传到目标设备。</li>
+        </ol>
+        <p><code>.kia</code> 文件经 Argon2id 密钥派生与 AES-256-GCM 加密；没有正确密码时不能读取其中资产。</p>
+        <h3>在目标保险库中增量导入</h3>
+        <ol>
+          <li>目标设备先安装密岛、创建或打开目标保险库，并解锁。</li>
+          <li>设置 → 备份与恢复 → 资产批量迁移，选择 <code>.kia</code> 文件。</li>
+          <li>输入<b>导出时使用的主密码</b>（源库主密码）；不要求与目标保险库主密码相同。</li>
+          <li>点击「预览导入结果」，查看文件资产总数、预计新增数与完全重复数。预览只读，不会写入目标库。</li>
+          <li>确认后点击「确认增量导入」。目标库会把资产用自己的密钥重新加密后新增。</li>
+        </ol>
+        <ul>
+          <li>完全相同的资产（字段内容及隐私/收藏状态一致）会跳过，避免重复。</li>
+          <li>其他卡片作为新卡片追加；即使同网站/账号但内容不同也保留。<b>导入不会修改或删除现有卡片。</b></li>
+          <li>文件错误、密码错误或被篡改时，导入失败，目标库不发生变化。</li>
+          <li><code>.kia</code> 是迁移副本，不会自动同步。加密不等于可以公开分享；不要通过与文件相同的渠道传送密码。</li>
+        </ul>
+      </section>
+
+      <section id="s14">
+        <h2><span class="num">14</span>加密备份与恢复</h2>
+        <h3>导出（.kib）</h3>
+        <ol>
+          <li>设置 → 备份 → 「导出 .kib 文件」。</li>
+          <li>设置<b>备份密码</b>（可与主密码不同）。</li>
+          <li>下载 <code>keyisland-YYYY-MM-DD.kib</code>。</li>
+          <li>存到离线/另一处安全位置。</li>
+        </ol>
+        <div class="callout">备份文件本身已加密（KIB1：外层仅格式信息，内部 AES 加密），备份密码<b>不写进文件</b>。<br><b>恢复需要两样同时具备</b>：① 备份密码；② 对应的恢复密钥（<code>.kirk</code> 或恢复码）。缺一不可。</div>
+        <ul>
+          <li><b>7 天未备份</b>会有轻提示。</li>
+          <li><b>恢复</b>：设置 → 导入备份，选 <code>.kib</code> + 备份密码 + <code>.kirk</code>/恢复码。
+            <ul>
+              <li><b>覆盖导入</b>：完整替换当前库（换电脑/硬盘坏用）。</li>
+              <li><b>合并</b>：只补"当前库没有"的条目，相同跳过，冲突保留当前；仅同密钥世系允许合并。</li>
+            </ul>
+          </li>
+          <li>导入后回到锁定态，用主密码解锁。</li>
+        </ul>
+      </section>
+
+      <section id="s15">
+        <h2><span class="num">15</span>设置说明</h2>
+        <table>
+          <thead><tr><th>设置项</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>自动锁定档位</td><td>立即 / 5 分钟 / 30 分钟（默认）/ 4 小时 / 开机后。</td></tr>
+            <tr><td>剪贴板自动清空</td><td>默认 30 秒，可关/调；关闭后内容常留剪贴板。</td></tr>
+            <tr><td>防截屏</td><td>桌面版默认开；网页版置灰。</td></tr>
+            <tr><td>检查更新</td><td>当前版本<b>无任何网络请求</b>；网页版置灰，桌面版默认开但未启用联网。</td></tr>
+            <tr><td>数据文件位置</td><td>显示 <code>vault.db</code> 路径（默认 <code>AppData\Roaming\KeyIsland</code>），可"打开所在文件夹"；网页版显示"内存存储（未落盘）"。</td></tr>
+            <tr><td>操作日志/审计</td><td>记录复制、跳转、备份、恢复等（跳转只记域名不记令牌）。</td></tr>
+            <tr><td>上次备份</td><td>距上次导出天数，超 7 天提醒。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="s16">
+        <h2><span class="num">16</span>快捷键与高效操作一览</h2>
+        <table>
+          <thead><tr><th>位置</th><th>操作</th><th>效果</th></tr></thead>
+          <tbody>
+            <tr><td>主面板</td><td><span class="kbd">/</span></td><td>聚焦搜索框</td></tr>
+            <tr><td>主面板</td><td>按住卡片上的密码</td><td>临时显形，松开即隐藏</td></tr>
+            <tr><td>主面板</td><td>点 ☆</td><td>收藏 / 取消收藏</td></tr>
+            <tr><td>灵动岛</td><td>鼠标推到屏幕<b>上沿</b></td><td>唤出收起的胶囊；点一下展开</td></tr>
+            <tr><td>灵动岛</td><td>滚轮向下 / 向上</td><td>唤出滑动线，从第一张 / 最后一张开始翻</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Enter</span></td><td>复制当前卡片密码</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Shift</span> + <span class="kbd">Enter</span></td><td>复制当前卡片账号</td></tr>
+            <tr><td>滑动线</td><td><b>鼠标中键</b></td><td>退出滑动线，回到灵动岛面板</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Esc</span></td><td>关闭滑动线（不收岛）</td></tr>
+            <tr><td>灵动岛</td><td>右键</td><td>打开主面板 / 锁定 / 退出</td></tr>
+            <tr><td>主面板</td><td>左导航底部开关</td><td>白天 ⇄ 黑夜主题</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="s17">
+        <h2><span class="num">17</span>安全须知与常见疑问</h2>
+        <p><b>数据存在哪</b>：只存本机 <code>vault.db</code>；主密码经 Argon2id 派生密钥，条目 AES-256-GCM 逐条独立加密；解开库的密钥放 <b>Windows 凭据管理器</b>（绑定当前用户）；不联网、不同步、不上传。</p>
+        <ul>
+          <li><b>Q：换电脑/重装还能开吗？</b> 密钥绑定原 Windows 用户。换用户/重装后凭据丢失，数据在但打不开 → 换回原用户，或用 <code>.kib</code> 覆盖导入。<b>务必做备份。</b></li>
+          <li><b>Q：能放 OneDrive/坚果云同步吗？</b> 不建议，同步盘可能锁住 <code>vault.db</code> 致打不开。备份的 <code>.kib</code>（独立已加密文件）可放同步盘。</li>
+          <li><b>Q：会偷偷联网吗？</b> 不会。程序本身无网络请求，检查更新也未启用。</li>
+          <li><b>Q：主密码和恢复码哪个重要？</b> 同等重要。忘主密码可用恢复码找回；都丢则无解。请分别离线保存。</li>
+          <li><b>Q：主题切换会动到我的数据吗？</b> 不会，主题只改外观。灵动岛始终深色，不受切换影响。</li>
+        </ul>
+      </section>
+
+      <section id="s18">
+        <h2><span class="num">18</span>启动失败排查</h2>
+        <p>双击无反应或弹"启动失败"页，会中文说明原因并给三步操作：</p>
+        <table>
+          <thead><tr><th>现象</th><th>含义与对策</th></tr></thead>
+          <tbody>
+            <tr><td>数据在但密钥不在</td><td>凭据管理器密钥丢了（换用户/重装/清理工具）。对策：换回原用户；或用 <code>.kib</code> 覆盖导入；确认无法找回则把 <code>vault.db</code> 改名留档再重建。</td></tr>
+            <tr><td>无法访问凭据管理器</td><td>读不到密钥，数据无损。对策：用原用户登录；查 KeyIsland 条目；重启。</td></tr>
+            <tr><td>无法创建数据目录</td><td>空间不足/权限限制/安全软件拦截。对策：清空间/加白名单/打开文件夹确认可写。</td></tr>
+            <tr><td>无法打开数据库</td><td>另一进程占用/同步盘锁/损坏。对策：结束多余进程；暂停同步盘；先复制 <code>vault.db</code> 留档。</td></tr>
+          </tbody>
+        </table>
+        <p>启动失败页提供「打开数据文件夹」与「重试」。先复制重要文件留档，再按提示操作。</p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    密岛 KeyIsland · 终端用户手册（v0.1.8） · 本地优先的加密密码管理器
+  </footer>
+
+  <script>
+    (function () {
+      var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+      var map = {};
+      links.forEach(function (a) {
+        var id = a.getAttribute('href').slice(1);
+        var el = document.getElementById(id);
+        if (el) map[id] = a;
+      });
+      var sections = Object.keys(map).map(function (id) { return document.getElementById(id); });
+      function onScroll() {
+        var pos = window.scrollY + 120;
+        var current = sections[0];
+        sections.forEach(function (s) { if (s.offsetTop <= pos) current = s; });
+        links.forEach(function (a) { a.classList.remove('active'); });
+        if (current && map[current.id]) map[current.id].classList.add('active');
+      }
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    })();
+  </script>
 </body>
 </html>

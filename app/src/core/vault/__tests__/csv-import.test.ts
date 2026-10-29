@@ -1,13 +1,41 @@
 /** CSV 导入解析测试。 */
 import { describe, expect, it } from 'vitest';
-import { parseCsvRows, previewCsvImport, resolveCsvColumns } from '../csv-import';
+import { csvTemplateText, parseCsvRows, previewCsvImport, resolveCsvColumns } from '../csv-import';
+
 
 describe('CSV 解析', () => {
+  it('模板包含完整字段表头且不含示例密码', () => {
+    expect(csvTemplateText()).toContain('名称,平台,账号,密码,网址,本地应用目标,分类,标签,备注');
+    expect(csvTemplateText()).not.toContain('请替换为真实密码');
+  });
   it('解析引号、转义引号、逗号、CRLF 与 BOM', () => {
     const text = '\uFEFFname,username,password,url,notes\r\nGitHub,dev@example.com,"p,a""ss""1",https://github.com,"line1\r\nline2"\r\n';
     const rows = parseCsvRows(text);
     expect(rows).toHaveLength(2);
     expect(rows[1]).toEqual(['GitHub', 'dev@example.com', 'p,a""ss""1'.replace(/""/g, '"'), 'https://github.com', 'line1\r\nline2']);
+  });
+
+  it('支持手工列映射修正自动识别结果', () => {
+    const preview = previewCsvImport(
+      'service,login,secret\nGitHub,octocat,Pass-1-Aa1!\n',
+      { title: 'service', username: 'login', password: 'secret' },
+    );
+    expect(preview.items[0]).toMatchObject({ title: 'GitHub', username: 'octocat', password: 'Pass-1-Aa1!' });
+  });
+
+  it('手工映射可把可选字段设为不导入', () => {
+    const preview = previewCsvImport(
+      'service,login,secret,extra\nGitHub,octocat,Pass-1-Aa1!,ignore-me\n',
+      { title: 'service', username: 'login', password: 'secret', notes: null },
+    );
+    expect(preview.items[0].notes).toBeUndefined();
+    expect(preview.items[0].title).toBe('GitHub');
+  });
+
+  it('手工映射指向不存在的列时报错，而不是静默取空', () => {
+    expect(() =>
+      previewCsvImport('name,username,password\nGitHub,octocat,Pass-1-Aa1!\n', { title: 'name', username: 'nope', password: 'password' }),
+    ).toThrow(/不存在的列/);
   });
 
   it('识别常见表头别名（英文与中文）', () => {

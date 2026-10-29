@@ -224,35 +224,56 @@ export class ItemService {
     return this.items.size;
   }
 
-  /** 创建资产。 */
+  /** 创建单个资产。 */
   async createItem(input: CreateItemInput): Promise<ItemSummary> {
+    const created = await this.createItems([input]);
+    return created[0];
+  }
+
+  /** 批量创建资产：所有输入先校验，最后只写盘一次，避免导入半途留下半批数据。 */
+  async createItems(inputs: readonly CreateItemInput[]): Promise<ItemSummary[]> {
     await this.hydrate();
+    if (inputs.length === 0) {
+      return [];
+    }
     const now = this.now();
-    const visibility = input.visibility === undefined ? 'normal' : parseVisibility(input.visibility);
-    const id = this.nextId;
-    const item: ItemPlain = {
-      id,
-      title: requireText(input.title, ITEM_LIMITS.title, 'error.title_required'),
-      platform: optionalText(input.platform, ITEM_LIMITS.platform, 'error.platform_too_long'),
-      url: optionalText(input.url, ITEM_LIMITS.url, 'error.url_too_long'),
-      appPath: optionalText(input.appPath, ITEM_LIMITS.appPath, 'error.app_path_too_long'),
-      username: requireText(input.username, ITEM_LIMITS.username, 'error.username_required'),
-      password: requirePassword(input.password),
-      notes: optionalText(input.notes, ITEM_LIMITS.notes, 'error.notes_too_long'),
-      category:
-        optionalText(input.category, ITEM_LIMITS.category, 'error.category_too_long') ?? DEFAULT_CATEGORY,
-      tags: normalizeTags(input.tags),
-      visibility,
-      favorite: input.favorite === true,
-      passwordUpdatedAt: now,
-      createdAt: now,
-      updatedAt: now,
-      strength: passwordLevel(input.password),
-    };
-    this.items.set(id, item);
-    this.nextId = id + 1;
-    await this.flush();
-    return toItemSummary(item);
+    const originalNextId = this.nextId;
+    const created: ItemPlain[] = [];
+    try {
+      for (const input of inputs) {
+        const id = this.nextId;
+        const item: ItemPlain = {
+          id,
+          title: requireText(input.title, ITEM_LIMITS.title, 'error.title_required'),
+          platform: optionalText(input.platform, ITEM_LIMITS.platform, 'error.platform_too_long'),
+          url: optionalText(input.url, ITEM_LIMITS.url, 'error.url_too_long'),
+          appPath: optionalText(input.appPath, ITEM_LIMITS.appPath, 'error.app_path_too_long'),
+          username: requireText(input.username, ITEM_LIMITS.username, 'error.username_required'),
+          password: requirePassword(input.password),
+          notes: optionalText(input.notes, ITEM_LIMITS.notes, 'error.notes_too_long'),
+          category:
+            optionalText(input.category, ITEM_LIMITS.category, 'error.category_too_long') ?? DEFAULT_CATEGORY,
+          tags: normalizeTags(input.tags),
+          visibility: input.visibility === undefined ? 'normal' : parseVisibility(input.visibility),
+          favorite: input.favorite === true,
+          passwordUpdatedAt: now,
+          createdAt: now,
+          updatedAt: now,
+          strength: passwordLevel(input.password),
+        };
+        this.items.set(id, item);
+        this.nextId = id + 1;
+        created.push(item);
+      }
+      await this.flush();
+      return created.map(toItemSummary);
+    } catch (error) {
+      for (const item of created) {
+        this.items.delete(item.id);
+      }
+      this.nextId = originalNextId;
+      throw error;
+    }
   }
 
   /** 更新资产；未传 `visibility` 时保持原值（降级保护）。 */

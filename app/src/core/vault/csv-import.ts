@@ -10,19 +10,33 @@
 
 import type { CreateItemInput } from './types';
 
+/** 可直接用 Excel / WPS 打开的 UTF-8 CSV 模板。 */
+export const CSV_TEMPLATE =
+  '\uFEFF名称,平台,账号,密码,网址,本地应用目标,分类,标签,备注\r\n';
+
+export function csvTemplateText(): string {
+  return CSV_TEMPLATE;
+}
+
 /** 解析出的原始行（按列名取值）。 */
 export interface CsvRow {
   [column: string]: string;
 }
 
-/** 列名映射结果。 */
+/** 列名映射结果；null 表示不导入该可选字段。 */
 export interface CsvColumnMapping {
   title: string;
   username: string;
   password: string;
   url: string | null;
   notes: string | null;
+  platform?: string | null;
+  appPath?: string | null;
+  category?: string | null;
+  tags?: string | null;
 }
+
+export type CsvFieldKey = keyof CsvColumnMapping;
 
 /** 常见导出格式的表头别名（大小写不敏感、忽略空格与符号）。 */
 const HEADER_ALIASES: Readonly<Record<keyof CsvColumnMapping, readonly string[]>> = Object.freeze({
@@ -31,6 +45,10 @@ const HEADER_ALIASES: Readonly<Record<keyof CsvColumnMapping, readonly string[]>
   password: ['password', 'pass', 'login password', '密码'],
   url: ['url', 'website', 'uri', 'login uri', '网址', '链接'],
   notes: ['notes', 'note', 'comment', 'extra', '备注'],
+  platform: ['platform', 'service', 'site', '平台'],
+  appPath: ['app path', 'apppath', 'local app', '本地应用目标'],
+  category: ['category', '分类'],
+  tags: ['tags', 'tag', '标签'],
 });
 
 /** 归一化表头：小写、去掉非字母数字（中文保留）。 */
@@ -115,8 +133,23 @@ export function parseCsvRows(text: string): string[][] {
 }
 
 /** 把表头行解析为列名映射；识别不出必需列时抛错。 */
-export function resolveCsvColumns(header: readonly string[]): CsvColumnMapping {
+export function resolveCsvColumns(
+  header: readonly string[],
+  override?: Partial<Record<CsvFieldKey, string | null>>,
+): CsvColumnMapping {
+  // 手工映射指向不存在的列时立刻报错：静默取空值会让用户以为"导入成功但字段没了"。
+  if (override !== undefined) {
+    for (const column of Object.values(override)) {
+      if (typeof column === 'string' && !header.includes(column)) {
+        throw new Error(`CSV 映射指向不存在的列：${column}`);
+      }
+    }
+  }
+
   const find = (key: keyof CsvColumnMapping): string | null => {
+    if (override !== undefined && key in override) {
+      return override[key] ?? null;
+    }
     for (const column of header) {
       if (matchColumn(column, HEADER_ALIASES[key]) !== null) {
         return column;
@@ -131,7 +164,17 @@ export function resolveCsvColumns(header: readonly string[]): CsvColumnMapping {
   if (title === null || username === null || password === null) {
     throw new Error('CSV 表头缺少名称/账号/密码列');
   }
-  return { title, username, password, url: find('url'), notes: find('notes') };
+  return {
+    title,
+    username,
+    password,
+    url: find('url'),
+    notes: find('notes'),
+    platform: find('platform'),
+    appPath: find('appPath'),
+    category: find('category'),
+    tags: find('tags'),
+  };
 }
 
 /** 跳过某一行原因。 */
@@ -150,12 +193,15 @@ export interface CsvImportPreview {
 }
 
 /** 从 CSV 文本得到待创建条目。跳过项只给原因，不包含任何字段内容。 */
-export function previewCsvImport(text: string): CsvImportPreview {
+export function previewCsvImport(text: string, override?: Partial<Record<CsvFieldKey, string | null>>): CsvImportPreview {
   const rows = parseCsvRows(text);
   if (rows.length === 0) {
     throw new Error('CSV 文件为空');
   }
-  const mapping = resolveCsvColumns(rows[0]);
+  const mapping = resolveCsvColumns(rows[0], override);
+  if (mapping.title === null || mapping.username === null || mapping.password === null) {
+    throw new Error('CSV 映射缺少名称/账号/密码列');
+  }
 
   const items: CreateItemInput[] = [];
   const skipped: CsvSkipReason[] = [];
@@ -173,6 +219,10 @@ export function previewCsvImport(text: string): CsvImportPreview {
     const password = get(mapping.password);
     const url = get(mapping.url);
     const notes = get(mapping.notes);
+    const platform = get(mapping.platform ?? null);
+    const appPath = get(mapping.appPath ?? null);
+    const category = get(mapping.category ?? null);
+    const tags = get(mapping.tags ?? null);
 
     if (title.length === 0 && username.length === 0) {
       skipped.push({ line: index + 1, reason: '整行为空' });
@@ -194,6 +244,18 @@ export function previewCsvImport(text: string): CsvImportPreview {
     }
     if (notes.length > 0) {
       item.notes = notes;
+    }
+    if (platform.length > 0) {
+      item.platform = platform;
+    }
+    if (appPath.length > 0) {
+      item.appPath = appPath;
+    }
+    if (category.length > 0) {
+      item.category = category;
+    }
+    if (tags.length > 0) {
+      item.tags = tags.split(/[;,，；、]/).map((tag) => tag.trim()).filter(Boolean);
     }
     items.push(item);
   }

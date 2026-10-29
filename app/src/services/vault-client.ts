@@ -38,14 +38,21 @@ import {
   type ItemDetail,
   type ItemFilter,
   type ItemSummary,
+  type ItemPlain,
   type KirkFile,
   type LockReason,
   type SessionSnapshot,
   type UpdateItemInput,
   type Visibility,
 } from '../core/vault';
+import {
+  exportAssetTransfer as encodeAssetTransfer,
+  importAssetTransfer as decodeAssetTransfer,
+  toAssetTransferItem,
+  toCreateItemInput,
+} from '../core/vault/asset-transfer';
 import { requiresPrivacyAccess } from '../core/vault/types';
-import { ItemService } from '../core/vault/items';
+import { DEFAULT_CATEGORY, ItemService } from '../core/vault/items';
 import { decryptItem } from '../core/vault/item-codec';
 import { isPasswordStale, isPasswordStrong, summarizeHealth, type VaultHealthReport } from '../core/vault/health';
 import {
@@ -208,6 +215,65 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** 超过这么多天没备份就提醒（PRD FR-06 定案 7 天）。 */
 export const BACKUP_REMINDER_DAYS = 7;
 
+/** 参与"完全内容"比对的字段集合（不含 id、时间戳与强度）。 */
+interface ContentSignatureShape {
+  title: string;
+  platform: string | null;
+  url: string | null;
+  appPath: string | null;
+  username: string;
+  password: string;
+  notes: string | null;
+  category: string;
+  tags: readonly string[];
+  visibility: Visibility;
+  favorite: boolean;
+}
+
+/**
+ * 完全内容签名。
+ *
+ * 密文带随机 nonce，同一份内容两次加密的字节不同，所以去重**必须解密后按业务字段比对**。
+ * 时间戳与 id 不参与：同一张卡片导入两次，内容相同就该算重复。
+ */
+function contentSignature(item: ContentSignatureShape): string {
+  return JSON.stringify({
+    title: item.title,
+    platform: item.platform,
+    url: item.url,
+    appPath: item.appPath,
+    username: item.username,
+    password: item.password,
+    notes: item.notes,
+    category: item.category,
+    tags: item.tags,
+    visibility: item.visibility,
+    favorite: item.favorite,
+  });
+}
+
+/**
+ * 待创建输入的签名。
+ *
+ * 先按 `ItemService.createItems` 的默认值补齐，否则"CSV 没写分类"与"库里分类是默认值"
+ * 会被算成两张不同的卡片，重复导入就压不住。
+ */
+function signatureOfInput(input: CreateItemInput): string {
+  return contentSignature({
+    title: input.title,
+    platform: input.platform ?? null,
+    url: input.url ?? null,
+    appPath: input.appPath ?? null,
+    username: input.username,
+    password: input.password,
+    notes: input.notes ?? null,
+    category: input.category ?? DEFAULT_CATEGORY,
+    tags: input.tags ?? [],
+    visibility: input.visibility ?? 'normal',
+    favorite: input.favorite ?? false,
+  });
+}
+
 /** 隐藏卡片授权的调用选项。 */
 export interface HiddenAccessOptions {
   /**
@@ -244,6 +310,13 @@ export interface VaultClient {
   listItems(filter?: ItemFilter): Promise<ItemSummary[]>;
   getItem(id: number, options?: HiddenAccessOptions): Promise<ItemDetail>;
   createItem(input: CreateItemInput): Promise<ItemSummary>;
+  /** 原子批量创建：全部通过校验后整体落盘，失败时不留下部分导入。 */
+  createItems(inputs: readonly CreateItemInput[]): Promise<ItemSummary[]>;
+  /**
+   * 导入 CSV 预览结果：只追加、不覆盖，完全相同的卡片跳过。
+   * 返回新增与跳过数量，界面据此如实汇报（而不是一律说"已导入 N 张"）。
+   */
+  importCsvItems(inputs: readonly CreateItemInput[]): Promise<{ inserted: number; skipped: number }>;
   updateItem(id: number, input: UpdateItemInput): Promise<ItemSummary>;
   deleteItem(id: number): Promise<void>;
   /**
@@ -403,6 +476,10 @@ export interface VaultClient {
   auditPasswordHealth(): Promise<VaultHealthReport>;
   /** 用主密码导入 `.kib` 备份；导入后应用回到锁定态（SDD §9.2）。 */
   importBackup(input: ImportBackupInput): Promise<ImportBackupResult>;
+  /** 导出只含资产的 KIA1 加密包；导入时跨库重加密追加，不触碰 keyslots。 */
+  exportAssetBundle(password: string): Promise<string>;
+  previewAssetBundle(password: string, input: string): Promise<{ total: number; inserted: number; skipped: number }>;
+  importAssetBundle(password: string, input: string): Promise<{ inserted: number; skipped: number }>;
   /**
    * 轮换恢复密钥（PRD FR-08.1「怀疑泄露时轮换，旧密钥立即作废」）。
    *
@@ -938,11 +1015,18 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
   }
 
   async function internalCreateItem(input: CreateItemInput): Promise<ItemSummary> {
+    const created = await internalCreateItems([input]);
+    return created[0];
+  }
+
+  async function internalCreateItems(inputs: readonly CreateItemInput[]): Promise<ItemSummary[]> {
     const service = await requireItemService();
-    const summary = await service.createItem(input);
-    await syncRecencyWithVisibility(summary);
-    audit.record('item.create', { itemId: summary.id });
-    return summary;
+    const summaries = await service.createItems(inputs);
+    for (const summary of summaries) {
+      await syncRecencyWithVisibility(summary);
+      audit.record('item.create', { itemId: summary.id });
+    }
+    return summaries;
   }
 
   async function internalUpdateItem(id: number, input: UpdateItemInput): Promise<ItemSummary> {
@@ -1603,6 +1687,118 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
    *   并保持原库不变，成功后回到锁定态；
    * - `merge`：只增量插入资产，同站点冲突上报，密钥槽与元数据不替换。
    */
+  async function internalExportAssetBundle(password: string): Promise<string> {
+    await ensureLoaded();
+    if (session.snapshot().status !== 'unlocked') {
+      await awaitLockCleanup();
+      throw errors.vaultLocked();
+    }
+    await requireItemService();
+    const records = await storage.loadItems();
+    const dek = session.requireDek();
+    const items: ItemPlain[] = [];
+    for (const record of records) {
+      items.push(await decryptItem(record, dek));
+    }
+    return encodeAssetTransfer(
+      password,
+      {
+        schemaVersion: meta?.schemaVersion ?? 1,
+        items: items.map(toAssetTransferItem),
+      },
+    );
+  }
+
+  /** 当前库已有内容的签名集合（需解锁）。隐藏卡片也参与比对，避免导入出"看不见的重复"。 */
+  async function existingContentSignatures(): Promise<Set<string>> {
+    const records = await storage.loadItems();
+    const dek = session.requireDek();
+    const seen = new Set<string>();
+    for (const record of records) {
+      seen.add(contentSignature(await decryptItem(record, dek)));
+    }
+    return seen;
+  }
+
+  /**
+   * 过滤掉与库内已有内容（或同批更早条目）完全相同的输入。
+   *
+   * `seen` 会被就地更新，所以同一份文件里出现两条一模一样的记录时只保留第一条。
+   */
+  function selectNewItems(seen: Set<string>, inputs: readonly CreateItemInput[]): CreateItemInput[] {
+    const additions: CreateItemInput[] = [];
+    for (const input of inputs) {
+      const key = signatureOfInput(input);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      additions.push(input);
+    }
+    return additions;
+  }
+
+  async function internalPrepareAssetBundle(password: string, input: string): Promise<{
+    total: number;
+    additions: CreateItemInput[];
+    skipped: number;
+    service: ItemService;
+  }> {
+    const payload = await decodeAssetTransfer(password, input);
+    await ensureLoaded();
+    if (session.snapshot().status !== 'unlocked') {
+      await awaitLockCleanup();
+      throw errors.vaultLocked();
+    }
+    const service = await requireItemService();
+    const seen = await existingContentSignatures();
+    const additions = selectNewItems(seen, payload.items.map(toCreateItemInput));
+    return {
+      total: payload.items.length,
+      additions,
+      skipped: payload.items.length - additions.length,
+      service,
+    };
+  }
+
+  /**
+   * 从 CSV 预览结果批量导入。
+   *
+   * 与资产包迁移保持同一语义：**只追加、不覆盖**；完全相同的卡片跳过。
+   * 否则同一个 CSV 选两次就会把卡片翻倍——那是用户最容易踩到的坑。
+   */
+  async function internalImportCsvItems(
+    inputs: readonly CreateItemInput[],
+  ): Promise<{ inserted: number; skipped: number }> {
+    await ensureLoaded();
+    if (session.snapshot().status !== 'unlocked') {
+      await awaitLockCleanup();
+      throw errors.vaultLocked();
+    }
+    if (inputs.length === 0) {
+      return { inserted: 0, skipped: 0 };
+    }
+    const seen = await existingContentSignatures();
+    const additions = selectNewItems(seen, inputs);
+    const created = await internalCreateItems(additions);
+    return { inserted: created.length, skipped: inputs.length - additions.length };
+  }
+
+  async function internalPreviewAssetBundle(password: string, input: string): Promise<{ total: number; inserted: number; skipped: number }> {
+    const prepared = await internalPrepareAssetBundle(password, input);
+    return { total: prepared.total, inserted: prepared.additions.length, skipped: prepared.skipped };
+  }
+
+  async function internalImportAssetBundle(password: string, input: string): Promise<{ inserted: number; skipped: number }> {
+    const prepared = await internalPrepareAssetBundle(password, input);
+    const created = await prepared.service.createItems(prepared.additions);
+    for (const item of created) {
+      await syncRecencyWithVisibility(item);
+      audit.record('item.create', { itemId: item.id });
+    }
+    return { inserted: created.length, skipped: prepared.skipped };
+  }
+
   async function internalImportBackup(input: ImportBackupInput): Promise<ImportBackupResult> {
     const payload = await decodeBackup(input.password, input.kirkJson);
     await ensureLoaded();
@@ -1811,6 +2007,15 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     listItems: (filter) => guard(() => internalListItems(filter)),
     getItem: (id, options) => guard(() => internalGetItem(id, options)),
     createItem: (input) => guard(() => internalCreateItem(input)),
+    createItems: (inputs) => guard(() => internalCreateItems(inputs)),
+    importCsvItems: (inputs) =>
+      guard(async () => {
+        const result = await internalImportCsvItems(inputs);
+        if (result.inserted > 0) {
+          audit.record('backup.import', { detail: 'csv' });
+        }
+        return result;
+      }),
     updateItem: (id, input) => guard(() => internalUpdateItem(id, input)),
     deleteItem: (id) => guard(() => internalDeleteItem(id)),
     deleteItems: (ids, masterPassword) => guard(() => internalDeleteItems(ids, masterPassword)),
@@ -1865,6 +2070,14 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
       guard(async () => {
         const result = await internalImportBackup(input);
         audit.record('backup.import', { detail: result.mode });
+        return result;
+      }),
+    exportAssetBundle: (password) => guard(() => internalExportAssetBundle(password)),
+    previewAssetBundle: (password, input) => guard(() => internalPreviewAssetBundle(password, input)),
+    importAssetBundle: (password, input) =>
+      guard(async () => {
+        const result = await internalImportAssetBundle(password, input);
+        audit.record('backup.import', { detail: 'asset_bundle' });
         return result;
       }),
     dispose: () => guard(internalDispose),

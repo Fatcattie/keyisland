@@ -15,5 +15,6 @@ export * from './pinyin';
 export * from './recency';
 export * from './generator';
 export * from './backup';
+export * from './asset-transfer';
 export * from './csv-import';
 export * from './audit';

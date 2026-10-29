@@ -9,7 +9,7 @@
  * 另有一个主动锁定时机：页面转入后台时按 FR-01 触发系统锁屏锁定（可关）。
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useVaultClient } from '../../app/VaultProvider';
 import { useToast } from '../../components/ui/Toast';
 import { Island } from '../island/Island';
@@ -73,6 +73,25 @@ export function SessionGate(): JSX.Element {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /**
+   * 锁定即收起设置面板。
+   *
+   * `settingsOpen` 只能挂在门上（主面板与岛右键菜单共用），而锁定会把 `MainPanel`
+   * 整棵卸载——但**门自己的 state 不会跟着清**。于是"开着设置 → 锁定 → 解锁"之后，
+   * 设置弹窗会自己弹回来，用户刚解锁就掉进一个上次的弹窗里。
+   *
+   * 只处理 `unlocked → 非 unlocked` 这一条边沿：全形态与岛形态互切时 `settingsOpen`
+   * 必须保留（CHG-02「恢复原状态」），而那两种形态都是 unlocked，不会被这条规则波及。
+   */
+  const sessionStatus = snapshot?.status;
+  const previousStatus = useRef(sessionStatus);
+  useEffect(() => {
+    if (previousStatus.current === 'unlocked' && sessionStatus !== undefined && sessionStatus !== 'unlocked') {
+      setSettingsOpen(false);
+    }
+    previousStatus.current = sessionStatus;
+  }, [sessionStatus]);
 
   useEffect(() => {
     const onFocus = (): void => {

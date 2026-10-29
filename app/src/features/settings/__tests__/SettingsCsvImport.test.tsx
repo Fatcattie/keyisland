@@ -61,10 +61,39 @@ describe('设置面板 · CSV 导入', () => {
     pick(screen.getByLabelText('CSV 文件'), csvFile('只有一列\n值\n'));
 
     await waitFor(() => {
-      expect(screen.getByText('无法识别这个 CSV：需要包含「名称/账号/密码」三列')).toBeDefined();
+      expect(screen.getByText('没能自动识别列名，请在下方手动指定名称、账号和密码')).toBeDefined();
     });
     const importButton = screen.getByRole('button', { name: /导入 \d+ 张卡片/ });
     expect(importButton).toBeDisabled();
+  });
+
+  it('自动识别失败时仍可手动映射三列，映射后即可导入', async () => {
+    const client = await renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: '导入 CSV' }));
+    // 表头是自定义英文，别名表认不出来 —— 这正是最需要手动映射的场景。
+    pick(screen.getByLabelText('CSV 文件'), csvFile('service,login,secret\nGitHub,octocat,Pass-1-Aa1!\n'));
+
+    await waitFor(() => {
+      expect(screen.getByText('没能自动识别列名，请在下方手动指定名称、账号和密码')).toBeDefined();
+    });
+    // 映射界面必须存在（旧实现里此时整块都不渲染，用户无从修正）。
+    const titleSelect = screen.getByLabelText(/^名称/) as HTMLSelectElement;
+
+    fireEvent.change(titleSelect, { target: { value: 'service' } });
+    fireEvent.change(screen.getByLabelText(/^账号/), { target: { value: 'login' } });
+    fireEvent.change(screen.getByLabelText(/^密码/), { target: { value: 'secret' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '导入 1 张卡片' })).toBeDefined();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '导入 1 张卡片' }));
+    await waitFor(() => {
+      expect(screen.getByText(/已导入 1 张卡片/)).toBeDefined();
+    });
+
+    const list = await client.listItems();
+    expect(list).toHaveLength(1);
+    expect(list[0].title).toBe('GitHub');
   });
 
   it('确认导入后条目真的入库（走真实加密链路）', async () => {

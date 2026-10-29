@@ -60,6 +60,26 @@ import {
 import { AuditLogPanel } from './AuditLogPanel';
 import { RotateRecoveryKeyDialog } from './RotateRecoveryKeyDialog';
 
+/**
+ * 空映射：自动识别失败时给用户一张"全空"的映射表。
+ *
+ * 必填三列用空串表示"还没选"，可选列用 null 表示"不导入"——
+ * 两者语义不同，不能混用：空串会被当成"交给自动识别"，null 才是明确跳过。
+ */
+function blankCsvMapping(): CsvColumnMapping {
+  return {
+    title: '',
+    username: '',
+    password: '',
+    url: null,
+    notes: null,
+    platform: null,
+    appPath: null,
+    category: null,
+    tags: null,
+  };
+}
+
 /** 自动锁定档位。 */
 const POLICY_OPTIONS: ReadonlyArray<{ value: AutoLockPolicy; label: string }> = [
   { value: 'immediate', label: '立即（离开即锁）' },
@@ -1038,16 +1058,24 @@ export function SettingsPanel({
             });
       setCsvText(text);
       setCsvError(null);
+      setCsvPreview(null);
       setCsvMapping(null);
+      // 表头先落下来：即使自动识别失败，也要让用户能手工映射。
+      const rows = parseCsvRows(text);
+      const header = rows[0] ?? [];
+      setCsvHeaders(header);
+      if (header.length === 0) {
+        setCsvError('这个文件没有表头，无法判断哪一列是账号密码');
+        return;
+      }
       try {
-        const rows = parseCsvRows(text);
-        const mapping = resolveCsvColumns(rows[0] ?? []);
-        setCsvHeaders(rows[0] ?? []);
+        const mapping = resolveCsvColumns(header);
         setCsvMapping(mapping);
         setCsvPreview(previewCsvImport(text, mapping));
       } catch {
-        setCsvPreview(null);
-        setCsvError('无法识别这个 CSV：需要包含「名称/账号/密码」三列');
+        // 自动识别不出来 → 给一张空映射表，让用户自己指定三列必填字段。
+        setCsvMapping(blankCsvMapping());
+        setCsvError('没能自动识别列名，请在下方手动指定名称、账号和密码');
       }
     } catch {
       setCsvError('无法读取该文件，请确认它是 CSV 格式');
@@ -1055,11 +1083,27 @@ export function SettingsPanel({
   };
 
   const updateCsvMapping = (field: CsvFieldKey, column: string | null): void => {
-    if (csvMapping === null) return;
-    const next = { ...csvMapping, [field]: column } as CsvColumnMapping;
+    const next = { ...(csvMapping ?? blankCsvMapping()), [field]: column } as CsvColumnMapping;
     setCsvMapping(next);
+
+    // 只把用户真正选过的列作为覆盖项：
+    // - 必填三列留空时交给自动识别再试一次，失败才提示"请选择"；
+    // - 可选列留空是明确的「不导入」，必须传 null，否则会被自动识别又捡回来。
+    const override: Partial<Record<CsvFieldKey, string | null>> = {};
+    for (const key of Object.keys(next) as CsvFieldKey[]) {
+      const value = next[key] ?? null;
+      const required = key === 'title' || key === 'username' || key === 'password';
+      if (required) {
+        if (value !== null && value !== '') {
+          override[key] = value;
+        }
+      } else {
+        override[key] = value === '' ? null : value;
+      }
+    }
+
     try {
-      setCsvPreview(previewCsvImport(csvText, next));
+      setCsvPreview(previewCsvImport(csvText, override));
       setCsvError(null);
     } catch {
       setCsvPreview(null);
@@ -1424,7 +1468,7 @@ export function SettingsPanel({
                 </p>
               ) : null}
 
-              {csvMapping !== null ? (
+              {csvHeaders.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 rounded-card border border-line bg-surface-muted p-3 sm:grid-cols-2">
                   {([
                     ['title', '名称', true],
@@ -1441,13 +1485,13 @@ export function SettingsPanel({
                       <span>{label}{required ? ' *' : ''}</span>
                       <select
                         className="min-w-0 max-w-[170px] rounded border border-line-strong bg-surface px-1.5 py-1 text-[11px] text-fg"
-                        value={csvMapping[field] ?? ''}
+                        value={csvMapping?.[field] ?? ''}
                         onChange={(event) => updateCsvMapping(field, event.target.value || null)}
                       >
                         {!required ? <option value="">不导入</option> : null}
                         {csvHeaders.map((header, index) => {
                           const usedByAnotherRequired = (['title', 'username', 'password'] as const).some(
-                            (requiredField) => requiredField !== field && csvMapping[requiredField] === header,
+                            (requiredField) => requiredField !== field && csvMapping?.[requiredField] === header,
                           );
                           return (
                             <option key={`${header}-${index}`} value={header} disabled={required && usedByAnotherRequired}>

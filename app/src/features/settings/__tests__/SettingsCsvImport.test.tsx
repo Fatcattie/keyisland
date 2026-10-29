@@ -78,6 +78,10 @@ describe('设置面板 · CSV 导入', () => {
     });
     // 映射界面必须存在（旧实现里此时整块都不渲染，用户无从修正）。
     const titleSelect = screen.getByLabelText(/^名称/) as HTMLSelectElement;
+    // 必填列此刻必须是"未选择"：没有占位项时浏览器会显示第一个选项，
+    // 看起来像已经映射好了（截图里三列都显示同一个列名）。
+    expect(titleSelect.value).toBe('');
+    expect(screen.getAllByRole('option', { name: '请选择' }).length).toBeGreaterThanOrEqual(3);
 
     fireEvent.change(titleSelect, { target: { value: 'service' } });
     fireEvent.change(screen.getByLabelText(/^账号/), { target: { value: 'login' } });

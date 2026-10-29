@@ -190,6 +190,13 @@ export interface CsvImportPreview {
   skipped: CsvSkipReason[];
   /** 数据总行数（不含表头）。 */
   totalRows: number;
+  /**
+   * 本次预览**实际生效**的列映射。
+   *
+   * 必须回传：界面拿它来回填下拉框，才能保证"显示的就是正在用的"。
+   * 否则用户清空某个必填列后，自动识别又把它捡回来，界面显示空、实际却有值。
+   */
+  mapping: CsvColumnMapping;
 }
 
 /** 从 CSV 文本得到待创建条目。跳过项只给原因，不包含任何字段内容。 */
@@ -260,5 +267,5 @@ export function previewCsvImport(text: string, override?: Partial<Record<CsvFiel
     items.push(item);
   }
 
-  return { items, skipped, totalRows: rows.length - 1 };
+  return { items, skipped, totalRows: rows.length - 1, mapping };
 }

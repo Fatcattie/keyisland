@@ -1103,7 +1103,11 @@ export function SettingsPanel({
     }
 
     try {
-      setCsvPreview(previewCsvImport(csvText, override));
+      const preview = previewCsvImport(csvText, override);
+      // 用「实际生效的映射」回填：否则清空必填列后自动识别会悄悄捡回来，
+      // 界面显示"未选择"、实际却按某一列导入，这种不一致最难查。
+      setCsvMapping(preview.mapping);
+      setCsvPreview(preview);
       setCsvError(null);
     } catch {
       setCsvPreview(null);
@@ -1488,7 +1492,11 @@ export function SettingsPanel({
                         value={csvMapping?.[field] ?? ''}
                         onChange={(event) => updateCsvMapping(field, event.target.value || null)}
                       >
-                        {!required ? <option value="">不导入</option> : null}
+                        {/*
+                          必填列也要有占位项：value='' 若没有对应 option，
+                          浏览器会退回显示第一个选项，看起来像"已经选好了"。
+                        */}
+                        <option value="">{required ? '请选择' : '不导入'}</option>
                         {csvHeaders.map((header, index) => {
                           const usedByAnotherRequired = (['title', 'username', 'password'] as const).some(
                             (requiredField) => requiredField !== field && csvMapping?.[requiredField] === header,
@@ -1536,7 +1544,6 @@ export function SettingsPanel({
                       下载跳过行报告
                     </Button>
                   ) : null}
-                  <p className="mt-1 text-fg-faint">已读取文件内容：{csvText.length} 个字符</p>
                 </div>
               ) : null}
 

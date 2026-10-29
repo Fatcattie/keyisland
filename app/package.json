@@ -1,7 +1,7 @@
 {
   "name": "keyisland-app",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "type": "module",
   "description": "密岛 KeyIsland —— Windows 单机私人账密管理工具（Phase 0/1 工程骨架与 Vault 核心）",
   "scripts": {
@@ -22,7 +22,8 @@
     "desktop:verify": "npm run verify && node scripts/e2e/smoke.mjs --startup-failure",
     "tauri": "tauri",
     "test:watch": "vitest --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "e2e:settings-shots": "node scripts/e2e/settings-shots.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

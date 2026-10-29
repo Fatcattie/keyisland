@@ -1,6 +1,6 @@
 # 密岛 KeyIsland · app
 
-Windows 单机私人账密管理工具。当前版本 **0.1.10**，已是可安装的桌面应用（Tauri 2），
+Windows 单机私人账密管理工具。当前版本 **0.1.11**，已是可安装的桌面应用（Tauri 2），
 主面板 / 解锁 / 建库 / 灵动岛常驻 / 白天黑夜主题 / 系统托盘 / 启动失败屏均已实现。
 
 - 技术栈：React 18 + Vite 5 + Zustand + framer-motion（前端） / Tauri 2 + Rust（桌面壳）

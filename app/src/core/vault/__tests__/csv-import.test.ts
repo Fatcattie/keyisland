@@ -32,6 +32,16 @@ describe('CSV 解析', () => {
     expect(preview.items[0].title).toBe('GitHub');
   });
 
+  it('预览回传实际生效的映射，供界面回填', () => {
+    const preview = previewCsvImport('service,login,secret\nGitHub,octocat,Pass-1-Aa1!\n', {
+      title: 'service',
+      username: 'login',
+      password: 'secret',
+    });
+    expect(preview.mapping).toMatchObject({ title: 'service', username: 'login', password: 'secret' });
+    expect(preview.mapping.url).toBeNull();
+  });
+
   it('手工映射指向不存在的列时报错，而不是静默取空', () => {
     expect(() =>
       previewCsvImport('name,username,password\nGitHub,octocat,Pass-1-Aa1!\n', { title: 'name', username: 'nope', password: 'password' }),

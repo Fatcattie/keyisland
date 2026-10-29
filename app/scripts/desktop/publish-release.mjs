@@ -289,6 +289,29 @@ for (const [label, file] of [
   ok(`${label}  ${human(size)}`, `sha256 ${sha256(file).slice(0, 16)}…`);
 }
 
+/**
+ * 光"文件存在"不够：`--skip-build` 会复用旧产物，名字对、内容还是上一版。
+ * PE 里的版本资源是 UTF-16LE 存的，直接按字节找一遍最实在——
+ * 这比读文件名可靠，也比调 PowerShell 读 `VersionInfo` 稳。
+ */
+if (existsSync(exePath)) {
+  const needle = Buffer.from(VERSION, 'utf16le');
+  const binary = readFileSync(exePath);
+  let hits = 0;
+  for (let at = binary.indexOf(needle); at !== -1; at = binary.indexOf(needle, at + 2)) {
+    hits += 1;
+  }
+  if (hits > 0) {
+    ok('exe 版本资源匹配', `${VERSION} ×${hits}`);
+  } else {
+    fail(
+      'exe 里的版本资源不是当前版本',
+      `找不到 UTF-16 的 "${VERSION}"`,
+      '多半是复用了旧产物：去掉 --skip-build 重新出包',
+    );
+  }
+}
+
 if (blockers.length > 0) {
   console.log(`\n${c.red}产物缺失，已中止（不会发一个没有安装包的 Release）。${c.reset}\n`);
   process.exit(1);

@@ -23,7 +23,9 @@
     "tauri": "tauri",
     "test:watch": "vitest --watch",
     "typecheck": "tsc --noEmit",
-    "e2e:settings-shots": "node scripts/e2e/settings-shots.mjs"
+    "e2e:settings-shots": "node scripts/e2e/settings-shots.mjs",
+    "e2e:contrast": "node scripts/e2e/contrast-audit.mjs",
+    "e2e:visual": "node scripts/e2e/settings-shots.mjs && node scripts/e2e/contrast-audit.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

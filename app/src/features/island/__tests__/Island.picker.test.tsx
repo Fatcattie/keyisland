@@ -115,6 +115,26 @@ describe('灵动岛 · 滚轮滑动线选择器', () => {
     expect(screen.getByTestId('island-scroll-picker')).toBeInTheDocument();
   });
 
+  /**
+   * 真实鼠标落点是**滑动线里的选项行**，不是面板本身——事件要靠冒泡回到面板的
+   * `onMouseDown`。选项行现在只 `preventDefault()`（保住键盘焦点）不 `stopPropagation()`，
+   * 所以中键照样能退。这条用例就是钉住这个前提：谁哪天在行上加了 `stopPropagation`，
+   * 中键就会静默失效，而只按面板的用例发现不了。
+   */
+  it('在滑动线的选项行上按中键也能退出（靠冒泡回到面板）', async () => {
+    const harness = await setupWithItems();
+    const panel = await expand(harness);
+
+    fireEvent.wheel(panel, { deltaY: 100 });
+    await screen.findByTestId('island-scroll-picker');
+
+    fireEvent.mouseDown(screen.getByTestId('island-picker-option-0'), { button: 1 });
+    await waitFor(() => {
+      expect(screen.queryByTestId('island-scroll-picker')).toBeNull();
+    });
+    expect(screen.getByTestId('island-panel')).toBeInTheDocument();
+  });
+
   it('Esc 只关滑动线、不收起整个岛', async () => {
     const harness = await setupWithItems();
     const panel = await expand(harness);

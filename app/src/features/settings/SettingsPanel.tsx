@@ -15,6 +15,8 @@ import { describeError } from '../../lib/i18n';
 import { downloadTextFile } from '../../lib/format';
 import type { AutoLockPolicy, SessionSnapshot } from '../../core/vault/types';
 import { CLIPBOARD_TTL_OPTIONS } from '../../core/vault/types';
+import { isBackupEnvelope } from '../../core/vault/backup';
+import { isAssetTransferEnvelope } from '../../core/vault/asset-transfer';
 import type { VaultHealthReport } from '../../core/vault/health';
 import { isHealthy } from '../../core/vault/health';
 import {
@@ -1011,6 +1013,13 @@ export function SettingsPanel({
             reader.onerror = (): void => reject(new Error('无法读取该文件'));
             reader.readAsText(file);
           });
+      // 选错文件是最常见的操作失误：.kib 是完整库备份，语义完全不同，
+      // 直接说清楚该去哪儿，比让用户在"解密失败"里猜要好。
+      if (isBackupEnvelope(text)) {
+        setBundleImportText('');
+        toast('这是完整库备份（.kib），请用「导入完整备份」');
+        return;
+      }
       setBundleImportText(text);
       setBundlePreview(null);
       setBundlePreviewError(null);
@@ -1034,6 +1043,12 @@ export function SettingsPanel({
               };
               reader.readAsText(file);
             });
+      // 反向同理：把资产包塞进完整恢复，用户只会看到"备份无效"。
+      if (isAssetTransferEnvelope(text)) {
+        setImportText('');
+        toast('这是资产迁移包（.kia），请用「资产批量迁移」');
+        return;
+      }
       setImportText(text);
     } catch {
       toast('无法读取该文件，请确认它是 .kib 备份');

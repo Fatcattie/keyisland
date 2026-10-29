@@ -1,6 +1,6 @@
 [package]
 name = "keyisland"
-version = "0.1.11"
+version = "0.1.12"
 description = "密岛 KeyIsland — 本地加密账密管理"
 authors = ["KeyIsland"]
 edition = "2021"

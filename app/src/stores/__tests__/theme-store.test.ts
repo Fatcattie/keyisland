@@ -12,6 +12,7 @@ import {
   applyTheme,
   readStoredTheme,
   resolveInitialTheme,
+  syncWithSystemPreference,
   THEME_STORAGE_KEY,
   useThemeStore,
 } from '../theme-store';
@@ -85,5 +86,38 @@ describe('useThemeStore', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('跟随系统主题变化', () => {
+  it('用户从没选过时跟随系统切深色，但不替用户落盘', () => {
+    useThemeStore.setState({ mode: 'light' });
+
+    syncWithSystemPreference(true);
+
+    expect(useThemeStore.getState().mode).toBe('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    // 关键：跟随系统 ≠ 用户做了选择，下次启动仍应先问系统。
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+
+  it('用户选过之后，系统怎么变都不动', () => {
+    useThemeStore.getState().setMode('light');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+
+    syncWithSystemPreference(true);
+
+    expect(useThemeStore.getState().mode).toBe('light');
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+  });
+
+  it('系统偏好与当前一致时不重复写（避免无谓的重渲染）', () => {
+    useThemeStore.setState({ mode: 'dark' });
+    const before = document.documentElement.dataset.theme;
+
+    syncWithSystemPreference(true);
+
+    expect(useThemeStore.getState().mode).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe(before);
   });
 });

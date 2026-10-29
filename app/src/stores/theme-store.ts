@@ -89,3 +89,40 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
     get().setMode(get().mode === 'dark' ? 'light' : 'dark');
   },
 }));
+
+/**
+ * 系统主题变了（`prefers-color-scheme` 的 change 事件）。
+ *
+ * 只在**用户从没手动选过**时跟随：一旦他按过开关，系统怎么变都与他无关——
+ * 不然"我明明选了黑夜，傍晚系统一变又被改回白天"会显得应用不听人话。
+ *
+ * 刻意**不落盘**：跟随系统不等于替用户做决定，下次启动仍然先问系统。
+ * 抽成这个纯函数是为了可测——jsdom 没有 `matchMedia` 事件，伪造 MediaQueryList
+ * 比直接调用这个函数麻烦得多。
+ */
+export function syncWithSystemPreference(dark: boolean): void {
+  if (readStoredTheme() !== null) {
+    return;
+  }
+  const mode: ThemeMode = dark ? 'dark' : 'light';
+  if (useThemeStore.getState().mode === mode) {
+    return;
+  }
+  applyTheme(mode);
+  useThemeStore.setState({ mode });
+}
+
+/** 订阅系统主题变化，返回取消订阅函数（浏览器不支持时返回空操作）。 */
+export function watchSystemTheme(): () => void {
+  if (typeof window.matchMedia !== 'function') {
+    return () => {};
+  }
+  const query = window.matchMedia('(prefers-color-scheme: dark)');
+  const onChange = (event: MediaQueryListEvent): void => {
+    syncWithSystemPreference(event.matches);
+  };
+  query.addEventListener('change', onChange);
+  return () => {
+    query.removeEventListener('change', onChange);
+  };
+}

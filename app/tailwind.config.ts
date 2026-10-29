@@ -44,6 +44,8 @@ const config: Config = {
         'fg-faint': semantic('fg-faint'),
         accent: semantic('accent'),
         'accent-fg': semantic('accent-fg'),
+        // 整行按钮的 hover 底色：亮色=白（与改造前一致），深色=比侧栏亮一档的灰。
+        hover: semantic('hover'),
       },
       borderRadius: {
         card: '0.75rem',

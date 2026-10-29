@@ -565,7 +565,7 @@ export function MainPanel({
                   className={`rounded-pill px-3 py-2 text-left text-xs font-medium transition-colors ${
                     active
                       ? 'bg-surface text-fg shadow-card'
-                      : 'text-fg-subtle hover:bg-surface/60 hover:text-fg'
+                      : 'text-fg-subtle hover:bg-hover/60 hover:text-fg'
                   }`}
                 >
                   {item.label}
@@ -592,7 +592,7 @@ export function MainPanel({
             <button
               type="button"
               onClick={() => onSettingsOpenChange(true)}
-              className="flex items-center gap-2 rounded-pill px-3 py-2 text-left text-xs font-medium text-fg-subtle transition-colors hover:bg-surface/60 hover:text-fg"
+              className="flex items-center gap-2 rounded-pill px-3 py-2 text-left text-xs font-medium text-fg-subtle transition-colors hover:bg-hover/60 hover:text-fg"
             >
               <Settings aria-hidden="true" size={13} />
               设置
@@ -600,7 +600,7 @@ export function MainPanel({
             <button
               type="button"
               onClick={handleLock}
-              className="rounded-pill px-3 py-2 text-left text-xs font-medium text-fg-subtle transition-colors hover:bg-surface/60 hover:text-fg"
+              className="rounded-pill px-3 py-2 text-left text-xs font-medium text-fg-subtle transition-colors hover:bg-hover/60 hover:text-fg"
             >
               立即锁定
             </button>

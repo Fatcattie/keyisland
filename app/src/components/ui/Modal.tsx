@@ -96,7 +96,11 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/40 px-4 py-10 backdrop-blur-[2px]"
+      /*
+       * 遮罩用固定的近黑（不能跟 accent：深色下 accent 是近白，蒙层会变成一片白）。
+       * 深色主题下页面本身已经接近纯黑，40% 的压暗几乎看不出来，单独加重一档。
+       */
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-zinc-950/40 px-4 py-10 backdrop-blur-[2px] dark:bg-black/65"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

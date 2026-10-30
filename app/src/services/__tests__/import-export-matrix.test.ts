@@ -171,6 +171,54 @@ describe('验收矩阵 · .kia 资产迁移', () => {
     await expect(target.importAssetBundle(MASTER, kib)).rejects.toThrow();
     await expect(target.listItems()).resolves.toHaveLength(1);
   });
+
+  it('按分类导出只带走该分类的卡片', async () => {
+    const source = newClient();
+    await source.initialize({ masterPassword: MASTER });
+    await source.createItem({ title: 'Work', username: 'u1', password: WEAK_ENOUGH, category: '工作' });
+    await source.createItem({ title: 'Play', username: 'u2', password: WEAK_ENOUGH, category: '娱乐' });
+
+    const bundle = await source.exportAssetBundle(MASTER, { category: '工作' });
+
+    const target = newClient();
+    await target.initialize({ masterPassword: OTHER });
+    await expect(target.importAssetBundle(MASTER, bundle)).resolves.toEqual({ inserted: 1, skipped: 0 });
+    const list = await target.listItems();
+    expect(list.map((item) => item.title)).toEqual(['Work']);
+  });
+
+  it('分类下的隐藏卡片跟着分类一起走（档位不变）', async () => {
+    const source = newClient();
+    await source.initialize({ masterPassword: MASTER });
+    await source.createItem({
+      title: 'Hidden',
+      username: 'u1',
+      password: WEAK_ENOUGH,
+      category: '工作',
+      visibility: 'hidden',
+    });
+    await source.createItem({ title: 'Plain', username: 'u2', password: WEAK_ENOUGH, category: '工作' });
+
+    const bundle = await source.exportAssetBundle(MASTER, { category: '工作' });
+
+    const target = newClient();
+    await target.initialize({ masterPassword: OTHER });
+    // 隐藏卡不出现在列表里，但确实被带过来了：两条都插进去了。
+    await expect(target.importAssetBundle(MASTER, bundle)).resolves.toEqual({ inserted: 2, skipped: 0 });
+    await expect(target.listItems()).resolves.toHaveLength(1);
+  });
+
+  it('指定分类为空时拒绝导出，不产出空包', async () => {
+    const client = newClient();
+    await client.initialize({ masterPassword: MASTER });
+    await client.createItem({ title: 'Only', username: 'u', password: WEAK_ENOUGH, category: '工作' });
+
+    await expectCode(
+      client.exportAssetBundle(MASTER, { category: '金融' }),
+      'VALIDATION_FAILED',
+      'error.export_empty',
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

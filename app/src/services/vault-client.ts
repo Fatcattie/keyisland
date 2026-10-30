@@ -160,6 +160,12 @@ export interface RecoveryVerifiedResult {
   verified: true;
 }
 
+/** 资产迁移包（`.kia`）导出选项。 */
+export interface ExportAssetOptions {
+  /** 只导出该分类下的卡片；省略则导出全库。 */
+  category?: string;
+}
+
 /** 备份恢复模式。 */
 export type BackupRestoreMode = 'overwrite' | 'merge';
 
@@ -477,7 +483,15 @@ export interface VaultClient {
   /** 用主密码导入 `.kib` 备份；导入后应用回到锁定态（SDD §9.2）。 */
   importBackup(input: ImportBackupInput): Promise<ImportBackupResult>;
   /** 导出只含资产的 KIA1 加密包；导入时跨库重加密追加，不触碰 keyslots。 */
-  exportAssetBundle(password: string): Promise<string>;
+  /**
+   * 导出资产迁移包（`.kia`）。
+   *
+   * `options.category` 省略时导出全库；指定时只导出该分类下的卡片。
+   * 分类过滤在**密文记录**上完成（分类是明文字段），因此隐藏卡片也会跟着
+   * 自己的分类走——它们不出现在列表里，但属于这个分类就该被带走，
+   * 否则用户会得到一个「少了东西」却看不出少了什么的包。
+   */
+  exportAssetBundle(password: string, options?: ExportAssetOptions): Promise<string>;
   previewAssetBundle(password: string, input: string): Promise<{ total: number; inserted: number; skipped: number }>;
   importAssetBundle(password: string, input: string): Promise<{ inserted: number; skipped: number }>;
   /**
@@ -1687,7 +1701,10 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
    *   并保持原库不变，成功后回到锁定态；
    * - `merge`：只增量插入资产，同站点冲突上报，密钥槽与元数据不替换。
    */
-  async function internalExportAssetBundle(password: string): Promise<string> {
+  async function internalExportAssetBundle(
+    password: string,
+    options: ExportAssetOptions = {},
+  ): Promise<string> {
     await ensureLoaded();
     if (session.snapshot().status !== 'unlocked') {
       await awaitLockCleanup();
@@ -1695,9 +1712,17 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     }
     await requireItemService();
     const records = await storage.loadItems();
+    const category = options.category;
+    const selected =
+      category === undefined ? records : records.filter((record) => record.category === category);
+    // 指定了分类却一张都没有：宁可当场报错，也不要导出一个空包让用户
+    // 以为"迁移成功、对方就是没有卡片"。
+    if (category !== undefined && selected.length === 0) {
+      throw errors.validationFailed('error.export_empty');
+    }
     const dek = session.requireDek();
     const items: ItemPlain[] = [];
-    for (const record of records) {
+    for (const record of selected) {
       items.push(await decryptItem(record, dek));
     }
     return encodeAssetTransfer(
@@ -2072,7 +2097,7 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
         audit.record('backup.import', { detail: result.mode });
         return result;
       }),
-    exportAssetBundle: (password) => guard(() => internalExportAssetBundle(password)),
+    exportAssetBundle: (password, options) => guard(() => internalExportAssetBundle(password, options)),
     previewAssetBundle: (password, input) => guard(() => internalPreviewAssetBundle(password, input)),
     importAssetBundle: (password, input) =>
       guard(async () => {

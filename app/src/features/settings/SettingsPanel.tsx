@@ -516,6 +516,9 @@ export function SettingsPanel({
   const [bundleImportText, setBundleImportText] = useState('');
   const [bundleImportPassword, setBundleImportPassword] = useState('');
   const [bundleExportPassword, setBundleExportPassword] = useState('');
+  /** 资产包导出范围：`''` = 全库，否则只导出该分类。 */
+  const [bundleExportCategory, setBundleExportCategory] = useState('');
+  const [bundleCategories, setBundleCategories] = useState<string[]>([]);
   const [bundlePreview, setBundlePreview] = useState<{ total: number; inserted: number; skipped: number } | null>(null);
   const [bundlePreviewError, setBundlePreviewError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -612,6 +615,21 @@ export function SettingsPanel({
       .catch(() => {
         if (active) {
           setAuditEntries([]);
+        }
+      });
+    // 资产包导出范围要列"库里真实存在哪些分类"：预设分类始终可选，
+    // 用户自定义的分类也要能选中。读不到就只留预设，导出范围是附属能力。
+    void client
+      .listItems()
+      .then((items) => {
+        if (!active) return;
+        setBundleCategories(
+          Array.from(new Set([...DEFAULT_CATEGORIES, ...items.map((item) => item.category)])),
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setBundleCategories([...DEFAULT_CATEGORIES]);
         }
       });
     // 热区配置（PRD FR-02）：读失败回落到默认 300px 居中，不挡设置面板。
@@ -925,13 +943,17 @@ export function SettingsPanel({
     setBusy(true);
     try {
       await client.verifyMasterPassword(password);
-      const text = await client.exportAssetBundle(password);
+      const text = await client.exportAssetBundle(
+        password,
+        bundleExportCategory === '' ? undefined : { category: bundleExportCategory },
+      );
       const filename = `keyisland-assets-${new Date().toISOString().slice(0, 10)}.kia`;
       if (!downloadTextFile(filename, text, 'application/octet-stream')) {
         toast('保存文件失败，资产包未导出；请重试');
         return;
       }
-      toast('已导出加密资产包，可在另一库中增量导入');
+      const scopeText = bundleExportCategory === '' ? '全库' : `「${bundleExportCategory}」分类`;
+      toast(`已导出${scopeText}的加密资产包，可在另一库中增量导入`);
       setBundleExportPassword('');
     } catch (caught) {
       toast(describeError(caught));
@@ -1714,6 +1736,25 @@ export function SettingsPanel({
                   value={bundleExportPassword}
                   onChange={(event) => setBundleExportPassword(event.target.value)}
                 />
+              </Field>
+              <Field
+                label="导出范围"
+                htmlFor="settings-bundle-export-scope"
+                hint="选某个分类时，该分类下的隐藏卡片也会一起导出（档位不变）"
+              >
+                <select
+                  id="settings-bundle-export-scope"
+                  className={INPUT_CLASS}
+                  value={bundleExportCategory}
+                  onChange={(event) => setBundleExportCategory(event.target.value)}
+                >
+                  <option value="">全部卡片</option>
+                  {bundleCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Button variant="primary" size="sm" loading={busy} onClick={() => void handleExportAssetBundle()}>
                 导出加密资产包

@@ -78,6 +78,7 @@ const MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   'error.backup_invalid': '备份文件无法读取，可能是密码错误或文件已损坏',
   'error.backup_password_required': '请输入备份时使用的主密码',
   'error.backup_merge_unsupported': '该备份来自另一个保险库，不能合并导入，请改用「覆盖导入」',
+  'error.export_empty': '这个分类下还没有卡片，换个导出范围再试',
 
   // —— 密码策略（`policy.ts` 的 reasons） ——
   'password.too_short': '至少 8 个字符',

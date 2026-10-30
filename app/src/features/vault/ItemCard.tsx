@@ -12,7 +12,7 @@
  * 密码明文只存在于组件本地 state，并在 pointerup / pointerleave / blur / 卸载时清空。
  */
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import {
   Clipboard,
@@ -126,8 +126,18 @@ function StrengthDots({ level }: { level: StrengthLevel }): JSX.Element {
   );
 }
 
-/** 卡片组件。 */
-export function ItemCard({
+/**
+ * 卡片组件。
+ *
+ * `memo` 不是为了省几次渲染，而是为了 1000 张卡时**输入还能跟手**：
+ * 搜索框的每次按键都会让 `MainPanel` 重渲染，没有 memo 就是 1000 张卡
+ * 各自重建 motion 值、spring、光晕模板（实测单次按键要几百毫秒）。
+ * 有 memo 后，只要卡片自己的 props 没变就直接跳过。
+ *
+ * 前提是 props 引用稳定——父组件因此把 `now` 做成每分钟跳一次的状态、
+ * 把 `onEdit` / `onChanged` 包成 `useCallback`。加 props 时注意别破坏这点。
+ */
+export const ItemCard = memo(function ItemCardImpl({
   item,
   allowHidden = false,
   hiddenAccessActive = false,
@@ -587,4 +597,4 @@ export function ItemCard({
       </motion.div>
     </div>
   );
-}
+});

@@ -154,6 +154,16 @@ export function MainPanel({
   }, [category]);
 
   const [query, setQuery] = useState('');
+  /**
+   * 真正参与筛选的搜索词，比输入框滞后一点。
+   *
+   * 为什么需要：每次 query 变化都会重跑 `reload()`，而它要把整批卡片重新渲染进
+   * DOM——1000 张卡约 6 万个节点，实测一次全量重建要 1 秒以上。没有这一层，
+   * 输入「site-0500」这 9 个字符就是 9 次全量重建，键盘输入会明显拖住。
+   *
+   * 输入框本身仍绑 `query`，所以光标、回显、输入法都不受影响，只是列表晚 180ms 跟上。
+   */
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [hiddenItems, setHiddenItems] = useState<ItemSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,7 +193,21 @@ export function MainPanel({
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const sessionRemaining = useCountdown(snapshot.unlockedUntil);
-  const now = Date.now();
+  /**
+   * 注入给卡片的"现在"，供「几分钟前」使用。
+   *
+   * 以前这里是 `const now = Date.now()`——每次渲染都变。这看着无害，实际是把
+   * `ItemCard` 的 memo 彻底废掉：只要父组件因为**任何**原因重渲染（打字、
+   * 会话倒计时每 500ms 一跳、toast），`now` 就是一个新值，1000 张卡全部重算。
+   * 改成每分钟跳一次的状态后，`now` 在两次跳动之间是稳定的，卡片才能真的跳过渲染。
+   *
+   * 60s 是 `formatRelative` 的最小粒度（<60s 显示「刚刚」），再快也看不出差别。
+   */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   /** 隐私授权当前是否生效（驱动遮罩卡片的字段显示）。 */
   const hiddenAccessActive = hiddenGrantUntil !== null && Date.now() < hiddenGrantUntil;
 
@@ -202,6 +226,15 @@ export function MainPanel({
     return list;
   }, [categories, tags]);
 
+  /** 输入 → 筛选之间的去抖。清空搜索也要走一遍，保持一致。 */
+  useEffect(() => {
+    if (query === appliedQuery) {
+      return;
+    }
+    const timer = setTimeout(() => setAppliedQuery(query), 180);
+    return () => clearTimeout(timer);
+  }, [query, appliedQuery]);
+
   const reload = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
@@ -217,7 +250,7 @@ export function MainPanel({
         return;
       }
       const filter: ItemFilter = { sort };
-      const trimmed = query.trim();
+      const trimmed = appliedQuery.trim();
       if (trimmed.length > 0) {
         filter.text = trimmed;
       }
@@ -235,7 +268,7 @@ export function MainPanel({
     } finally {
       setLoading(false);
     }
-  }, [category, client, hiddenItems, query, sort, toast]);
+  }, [appliedQuery, category, client, hiddenItems, sort, toast]);
 
   useEffect(() => {
     void reload();
@@ -458,15 +491,34 @@ export function MainPanel({
     setEditorOpen(true);
   };
 
-  const handleEdit = async (item: ItemSummary): Promise<void> => {
-    try {
-      const detail = await client.getItem(item.id, { allowHidden: category === 'hidden' });
-      setEditing(detail);
-      setEditorOpen(true);
-    } catch (caught) {
-      toast(describeError(caught));
-    }
-  };
+  const handleEdit = useCallback(
+    async (item: ItemSummary): Promise<void> => {
+      try {
+        const detail = await client.getItem(item.id, { allowHidden: category === 'hidden' });
+        setEditing(detail);
+        setEditorOpen(true);
+      } catch (caught) {
+        toast(describeError(caught));
+      }
+    },
+    [category, client, toast],
+  );
+
+  /**
+   * 传给卡片的回调必须**引用稳定**，否则 `ItemCard` 的 memo 形同不存在
+   * （每次渲染都是新函数 → 每张卡都判定 props 变了）。
+   * 这两个包装器存在的唯一理由就是稳定引用。
+   */
+  const handleCardEdit = useCallback(
+    (item: ItemSummary): void => {
+      void handleEdit(item);
+    },
+    [handleEdit],
+  );
+
+  const handleCardChanged = useCallback((): void => {
+    void reload();
+  }, [reload]);
 
   const handleConfirmDelete = async (): Promise<void> => {
     if (deleteTarget === null) {
@@ -536,7 +588,9 @@ export function MainPanel({
     }
   };
 
-  const emptySearch = query.trim().length > 0;
+  // 用 appliedQuery 而不是 query：空状态要说的是"当前这批结果为什么是空的"，
+  // 而结果是由 appliedQuery 决定的。用 query 会在去抖窗口里提前显示「没有匹配」。
+  const emptySearch = appliedQuery.trim().length > 0;
   /**
    * 「收藏」与「标签」是**筛选视图**，不是分类：它们为空时库里通常还有别的卡片。
    * 这种空状态如果沿用「还没有资产」，会让用户以为数据丢了（尤其刚导入完、
@@ -818,9 +872,9 @@ export function MainPanel({
                   allowHidden={category === 'hidden'}
                   hiddenAccessActive={hiddenAccessActive}
                   onRequestHiddenAccess={openRevealAccess}
-                  onEdit={(target) => void handleEdit(target)}
+                  onEdit={handleCardEdit}
                   onRequestDelete={setDeleteTarget}
-                  onChanged={() => void reload()}
+                  onChanged={handleCardChanged}
                   selectMode={selectMode}
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={toggleSelect}

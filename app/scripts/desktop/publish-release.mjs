@@ -27,7 +27,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -279,8 +279,16 @@ if (SKIP_BUILD) {
    */
   const distDir = join(APP_ROOT, 'dist');
   if (existsSync(distDir)) {
-    const aside = join(tmpdir(), `ki-dist-${Date.now()}`);
+    /**
+     * 落点必须与 `dist` **同一个盘**：`rename` 跨卷会抛 `EXDEV`，
+     * 而 Node 不像 `mv` 那样自动退化成"复制 + 删除"。仓库在 D:、
+     * `os.tmpdir()` 在 C:，第一版就是在这里失败的。
+     * `node_modules/.cache` 同盘、且本来就该被忽略。
+     */
+    const asideRoot = join(APP_ROOT, 'node_modules', '.cache');
+    const aside = join(asideRoot, `dist-aside-${Date.now()}`);
     try {
+      mkdirSync(asideRoot, { recursive: true });
       renameSync(distDir, aside);
       ok('旧 dist 已挪开', aside);
     } catch (error) {

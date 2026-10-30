@@ -17,9 +17,10 @@
  * 5. gh 已登录、MSVC 四件套齐全——否则会先花十分钟编译再失败。
  *
  * 用法：
- *   npm run release:publish              # 出包 + 发版
- *   npm run release:publish -- --dry-run # 只做预检并打印计划，不编译、不发布
- *   npm run release:publish -- --skip-build  # 复用现有产物（刚构建过时用）
+ *   npm run release:publish              # 出包 + 视觉验收 + 发版
+ *   npm run release:publish -- --dry-run # 只做预检并打印计划，不编译、不发布、不跑视觉
+ *   npm run release:publish -- --skip-build  # 复用现有产物（刚构建过时用，跳过视觉验收）
+ *   npm run release:publish -- --skip-visual # 逃生阀：视觉脚本自己坏了时用，会在输出里留痕
  *
  * 退出码：0 = 已发布（或 dry-run 预检通过）；1 = 有阻塞项。
  */
@@ -30,6 +31,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { findChrome } from '../e2e/cdp.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(HERE, '..', '..');
@@ -314,6 +316,60 @@ if (existsSync(exePath)) {
 
 if (blockers.length > 0) {
   console.log(`\n${c.red}产物缺失，已中止（不会发一个没有安装包的 Release）。${c.reset}\n`);
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// 7.5 视觉验收（改了 UI 就必须看真实渲染）
+// ---------------------------------------------------------------------------
+
+/**
+ * 为什么放进发布链路：0.1.9 → 0.1.15 连发七个版本，其中五个是出包后自审补的漏，
+ * 而 `e2e:visual` 抓到的恰好都是 jsdom 抓不到的那类——控件压根没渲染、
+ * 下拉"假选中"（受控值为空但没有对应 option，浏览器回退显示第一项）、深色下一块亮斑。
+ * 它只要 90 秒；而一次错误发版要重走升版 + 出包 + 改 Release。
+ *
+ * 三条边界写在这里，免得以后误以为它很万能：
+ * - `--skip-build` / `--dry-run` 跳过：复用的 dist 不一定对应当前源码，测了反而误导。
+ * - 找不到 Chrome / Edge 只警告不拦：没装浏览器的机器不该发不了版，但必须把
+ *   "本次没做视觉校验"说出来，不能假装验过。
+ * - `--skip-visual` 是逃生阀：脚本自己坏掉时不该把发版彻底卡死，但要留痕。
+ */
+const SKIP_VISUAL = process.argv.includes('--skip-visual');
+
+console.log(`\n${c.bold}视觉验收${c.reset}`);
+if (DRY_RUN) {
+  warn('dry-run 不跑视觉验收', '真实发版时会跑（约 90 秒）');
+} else if (SKIP_BUILD) {
+  warn('已跳过', '复用了现有产物，dist 不一定对应当前源码；要校验请去掉 --skip-build');
+} else if (SKIP_VISUAL) {
+  warn('已按 --skip-visual 跳过', '本次发布没有做视觉校验');
+} else {
+  const chromePath = findChrome();
+  if (chromePath === undefined) {
+    warn('未找到 Chrome / Edge，已跳过', '本次发布没有做视觉校验（截图与对比度都没跑）');
+  } else {
+    try {
+      // 不用 runVisible：它走 shell，路径含空格时会被拆开。
+      for (const script of ['settings-shots.mjs', 'contrast-audit.mjs']) {
+        execFileSync(process.execPath, [join(APP_ROOT, 'scripts', 'e2e', script)], {
+          cwd: APP_ROOT,
+          stdio: 'inherit',
+        });
+      }
+      ok('截图与对比度审计通过', 'artifacts/settings');
+    } catch {
+      fail(
+        '视觉验收未通过',
+        '截图或对比度审计报错',
+        '先手动跑 `npm run e2e:visual` 看是哪张图 / 哪处对比度，修完再发版',
+      );
+    }
+  }
+}
+
+if (blockers.length > 0) {
+  console.log(`\n${c.red}视觉验收未通过，已中止（不会发布一个没看过的界面）。${c.reset}\n`);
   process.exit(1);
 }
 

@@ -228,8 +228,29 @@ export async function mergeBackupItems(
   incoming: readonly EncryptedItemRecord[],
   decrypt: (record: EncryptedItemRecord) => Promise<ItemPlain>,
 ): Promise<MergeBackupResult> {
-  const identity = (item: EncryptedItemRecord): string => `${item.platform ?? ''}|${item.url ?? ''}|${item.category}`;
-  const existingIdentities = new Set(existing.map(identity));
+  /**
+   * 「同一站点」的判据。
+   *
+   * 平台与网址都为空时返回 `null`——**没有站点标识就不能断言是同一站点**。
+   *
+   * 旧实现直接拼 `${platform}|${url}|${category}`，空值会得到 `"||其他"`，
+   * 于是所有"只填名称+账号+密码"的卡片（这是最常见的一种填法）彼此都算
+   * 同一站点：恢复备份时，本该回来的卡片会被判成冲突而不插入，用户只看到
+   * 一句含糊的「N 个冲突」，实际是**数据没恢复回来**。这是合并路径上的丢数据。
+   *
+   * 有平台或网址时保持原语义不变（SDD §9.2「按平台/网址相同判冲突」）。
+   */
+  const identity = (item: EncryptedItemRecord): string | null => {
+    const platform = (item.platform ?? '').trim();
+    const url = (item.url ?? '').trim();
+    if (platform.length === 0 && url.length === 0) {
+      return null;
+    }
+    return `${platform}|${url}|${item.category}`;
+  };
+  const existingIdentities = new Set(
+    existing.map(identity).filter((key): key is string => key !== null),
+  );
   const existingPlain = new Map<number, ItemPlain>();
   for (const record of existing) {
     existingPlain.set(record.id, await decrypt(record));
@@ -258,7 +279,8 @@ export async function mergeBackupItems(
       continue;
     }
     // 同一站点的不同账号/密码 → 冲突，保留当前库版本并上报（同冲突只报一次）。
-    if (existingIdentities.has(key)) {
+    // key 为 null 表示两边都没有站点标识，这种情况只按内容判重，不判冲突。
+    if (key !== null && existingIdentities.has(key)) {
       if (seenKeys.has(key)) {
         skipped += 1;
         continue;

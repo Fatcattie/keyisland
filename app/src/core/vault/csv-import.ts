@@ -55,16 +55,37 @@ export interface CsvColumnMapping {
 
 export type CsvFieldKey = keyof CsvColumnMapping;
 
-/** 常见导出格式的表头别名（大小写不敏感、忽略空格与符号）。 */
+/**
+ * 常见导出格式的表头别名（大小写不敏感、忽略空格与符号）。
+ *
+ * 别名表就是"用户能直接把别家的导出文件丢进来"的全部家当，所以按真实导出文件补：
+ * - Chrome / Edge：`name,url,username,password,note`
+ * - LastPass：`url,username,password,extra,name,grouping,fav`
+ * - 1Password：`Title,Url,Username,Password,Notes`
+ * - Bitwarden：`folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp`
+ *
+ * Bitwarden 那三个 `login_*` 列是关键：缺了它们，一份完全正常的 Bitwarden 导出会报
+ * 「表头缺少名称/账号/密码列」，而数据其实一条不少——这是最容易劝退用户的一种失败。
+ * `folder` / `grouping` 都按"分类"收（它们本来就是别家的文件夹）。
+ */
 const HEADER_ALIASES: Readonly<Record<keyof CsvColumnMapping, readonly string[]>> = Object.freeze({
   title: ['name', 'title', 'account', 'entry', 'item', '名称', '标题', '条目'],
-  username: ['username', 'login', 'user', 'email', 'account name', '账号', '用户名'],
+  username: [
+    'username',
+    'login',
+    'user',
+    'email',
+    'account name',
+    'login username',
+    '账号',
+    '用户名',
+  ],
   password: ['password', 'pass', 'login password', '密码'],
   url: ['url', 'website', 'uri', 'login uri', '网址', '链接'],
   notes: ['notes', 'note', 'comment', 'extra', '备注'],
   platform: ['platform', 'service', 'site', '平台'],
   appPath: ['app path', 'apppath', 'local app', '本地应用目标'],
-  category: ['category', '分类'],
+  category: ['category', 'folder', 'grouping', '分类'],
   tags: ['tags', 'tag', '标签'],
 });
 

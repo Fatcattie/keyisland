@@ -28,6 +28,13 @@ const ROWS = (() => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1000;
 })();
 
+/**
+ * 主面板首屏铺多少张，**必须与 `src/features/vault/MainPanel.tsx` 的 `PAGE_SIZE` 一致**。
+ * 改那边忘了改这里，脚本会一直等不到"首屏就绪"。
+ */
+const PAGE_SIZE = 120;
+const FIRST_BATCH = Math.min(ROWS, PAGE_SIZE);
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -297,12 +304,29 @@ async function main() {
     await waitForText(`已导入 ${ROWS} 张`);
     const importMs = Date.now() - importStart;
 
-    // ── 列表渲染 ────────────────────────────────────────────────
-    // 关掉设置面板，看主面板把 1000 张卡铺出来要多久。
-    const renderStart = Date.now();
+    // ── 列表渲染：首屏只铺一页 ──────────────────────────────────
+    // 关掉设置面板，看主面板把首屏那一批铺出来要多久（分批渲染的收益就在这条）。
+    const firstStart = Date.now();
     await page.evaluate(`window.__perf.clickExact('关闭')`);
-    await waitFor(`window.__perf.listCount() === ${ROWS}`, 120000);
-    const listMs = Date.now() - renderStart;
+    await waitFor(`window.__perf.listCount() === ${FIRST_BATCH}`, 120000);
+    const firstBatchMs = Date.now() - firstStart;
+    const nodesFirstBatch = await page.evaluate('window.__perf.nodeCount()');
+
+    // ── 续批到全部 ──────────────────────────────────────────────
+    // 走真实的「加载更多」按钮（浏览器里滚到底也会触发同一段逻辑）。
+    const expandStart = Date.now();
+    for (;;) {
+      const count = await page.evaluate('window.__perf.listCount()');
+      if (count >= ROWS) {
+        break;
+      }
+      const clicked = await page.evaluate(`window.__perf.clickExact('加载更多')`);
+      if (!clicked) {
+        throw new Error(`只铺了 ${count} / ${ROWS} 张，却找不到「加载更多」`);
+      }
+      await waitFor(`window.__perf.listCount() > ${count}`, 120000);
+    }
+    const expandAllMs = Date.now() - expandStart;
     const nodes = await page.evaluate('window.__perf.nodeCount()');
 
     // ── 按键延迟 ────────────────────────────────────────────────
@@ -323,21 +347,22 @@ async function main() {
     const debounceWorks = immediate === ROWS;
     await waitFor(`window.__perf.listCount() === 1`, 120000);
     await page.evaluate(`window.__perf.setSearch('')`);
-    await waitFor(`window.__perf.listCount() === ${ROWS}`, 120000);
+    // 清空搜索会回到首屏那一页（换筛选条件即回第一页），不是回到全量。
+    await waitFor(`window.__perf.listCount() === ${FIRST_BATCH}`, 120000);
 
     // 一次性输入：理想路径，只有一次筛选。
     const onceMs = Math.round(
       await page.evaluate(`window.__perf.measureType(${JSON.stringify(TARGET)}, 0, 1)`),
     );
     await page.evaluate(`window.__perf.setSearch('')`);
-    await waitFor(`window.__perf.listCount() === ${ROWS}`, 120000);
+    await waitFor(`window.__perf.listCount() === ${FIRST_BATCH}`, 120000);
 
     // 逐字符输入（50ms 间隔）：真实打字节奏，落在去抖窗口内 → 只筛一次。
     const searchMs = Math.round(
       await page.evaluate(`window.__perf.measureType(${JSON.stringify(TARGET)}, 50, 1)`),
     );
     await page.evaluate(`window.__perf.setSearch('')`);
-    await waitFor(`window.__perf.listCount() === ${ROWS}`, 120000);
+    await waitFor(`window.__perf.listCount() === ${FIRST_BATCH}`, 120000);
 
     // 逐字符输入（250ms 间隔）：间隔大于去抖窗口 → 每次输入都真的筛一次。
     // 这就是"没有去抖"的等价场景，用来量化去抖到底省了多少。
@@ -345,10 +370,10 @@ async function main() {
       await page.evaluate(`window.__perf.measureType(${JSON.stringify(TARGET)}, 250, 1)`),
     );
 
-    // 清空搜索：回到 1000 张
+    // 清空搜索：回到首屏那一页
     const clearStart = Date.now();
     await page.evaluate(`window.__perf.setSearch('')`);
-    await waitFor(`window.__perf.listCount() === ${ROWS}`, 120000);
+    await waitFor(`window.__perf.listCount() === ${FIRST_BATCH}`, 120000);
     const clearMs = Date.now() - clearStart;
 
     const errors = page.consoleErrors();
@@ -356,13 +381,15 @@ async function main() {
       rows: ROWS,
       previewMs,
       importMs,
-      listMs,
+      firstBatchMs,
+      expandAllMs,
       keystrokeMs,
       onceMs,
       searchMs,
       slowTypeMs,
       clearMs,
       debounceWorks,
+      nodesFirstBatch,
       nodes,
       consoleErrors: errors,
       at: new Date().toISOString(),
@@ -372,12 +399,13 @@ async function main() {
     console.log(`\n${ROWS} 张卡片 · 真实 Chrome 1280×900\n`);
     console.log(`  CSV 预览                 ${previewMs} ms`);
     console.log(`  CSV 导入落库              ${importMs} ms`);
-    console.log(`  列表渲染 ${ROWS} 张          ${listMs} ms`);
+    console.log(`  首屏渲染 ${FIRST_BATCH} 张          ${firstBatchMs} ms  （节点 ${nodesFirstBatch}）`);
+    console.log(`  续批到 ${ROWS} 张            ${expandAllMs} ms  （节点 ${nodes}）`);
     console.log(`  按键延迟（中位数）        ${keystrokeMs === null ? '（找不到搜索框）' : `${keystrokeMs.toFixed(1)} ms`}`);
     console.log(`  搜索·一次性输入           ${onceMs} ms`);
     console.log(`  搜索·逐字符（50ms，去抖内）${searchMs} ms`);
     console.log(`  搜索·逐字符（250ms，等效无去抖）${slowTypeMs} ms`);
-    console.log(`  清空搜索回 ${ROWS} 张      ${clearMs} ms`);
+    console.log(`  清空搜索回首屏 ${FIRST_BATCH} 张   ${clearMs} ms`);
     console.log(`  去抖生效                  ${debounceWorks ? '是' : '否（输入后列表立刻变化）'}`);
     console.log(`  DOM 节点总数              ${nodes}`);
     if (errors.length > 0) {

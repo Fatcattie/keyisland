@@ -63,6 +63,17 @@ const CATEGORIES: readonly string[] = DEFAULT_CATEGORIES;
  */
 const TAG_NAV_PREFIX = 'tag:';
 
+/**
+ * 列表一次铺多少张，滚到底部再续。
+ *
+ * 1000 张卡 ≈ 6.1 万个 DOM 节点，整片画出来要 2 秒（`npm run e2e:perf` 实测）。
+ * 而密码管理器的典型动作是**搜索**，不是滚动翻找——先把一屏画出来，
+ * 比"一次性铺完再让用户等两秒"划算得多。
+ *
+ * 120 张约等于十几屏，正常滚动根本察觉不到分批；只有真的滚到底才会触发下一批。
+ */
+const PAGE_SIZE = 120;
+
 /** 导航项。 */
 interface NavItem {
   key: string;
@@ -208,6 +219,48 @@ export function MainPanel({
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
+
+  /** 列表当前铺了多少张（分批渲染，见 `PAGE_SIZE`）。 */
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * 换分类 / 换搜索词 / 换排序就回到第一页。
+   *
+   * 不跟着 `items` 变：收藏、删除、改标签都会重跑 `reload()`，`items` 换新数组，
+   * 但用户的浏览位置不该被重置——那样每改一张卡，滚到第 500 张的列表就跳回顶部。
+   */
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [appliedQuery, category, sort]);
+
+  const loadMore = useCallback((): void => {
+    setVisibleCount((current) => current + PAGE_SIZE);
+  }, []);
+
+  /**
+   * 滚到底部自动续一批。
+   *
+   * `rootMargin` 留 600px 提前量，避免用户看到"滚到底了、下面空的、然后卡片才出现"。
+   * 环境里没有 `IntersectionObserver`（jsdom）时什么都不做——测试仍然能靠
+   * 「加载更多」按钮走到同一段逻辑，不必为测试环境造一个假的观察器。
+   */
+  useEffect(() => {
+    const node = moreRef.current;
+    if (node === null || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadMore();
+        }
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [items.length, loadMore, visibleCount]);
   /** 隐私授权当前是否生效（驱动遮罩卡片的字段显示）。 */
   const hiddenAccessActive = hiddenGrantUntil !== null && Date.now() < hiddenGrantUntil;
 
@@ -855,32 +908,52 @@ export function MainPanel({
               </p>
             </div>
           ) : (
-            <div
-              data-testid="item-list"
-              data-view={viewMode}
-              className={
-                viewMode === 'grid'
-                  ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
-                  : 'flex flex-col gap-2'
-              }
-            >
-              {items.map((item) => (
-                <ItemCard
-                  key={item.id}
-                  item={item}
-                  now={now}
-                  allowHidden={category === 'hidden'}
-                  hiddenAccessActive={hiddenAccessActive}
-                  onRequestHiddenAccess={openRevealAccess}
-                  onEdit={handleCardEdit}
-                  onRequestDelete={setDeleteTarget}
-                  onChanged={handleCardChanged}
-                  selectMode={selectMode}
-                  selected={selectedIds.has(item.id)}
-                  onToggleSelect={toggleSelect}
-                />
-              ))}
-            </div>
+            <>
+              <div
+                data-testid="item-list"
+                data-view={viewMode}
+                className={
+                  viewMode === 'grid'
+                    ? 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
+                    : 'flex flex-col gap-2'
+                }
+              >
+                {items.slice(0, visibleCount).map((item) => (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    now={now}
+                    allowHidden={category === 'hidden'}
+                    hiddenAccessActive={hiddenAccessActive}
+                    onRequestHiddenAccess={openRevealAccess}
+                    onEdit={handleCardEdit}
+                    onRequestDelete={setDeleteTarget}
+                    onChanged={handleCardChanged}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(item.id)}
+                    onToggleSelect={toggleSelect}
+                  />
+                ))}
+              </div>
+              {/*
+                分批的"续批"入口。既是指示（告诉用户下面还有，不是数据丢了），
+                也是兜底按钮（jsdom 里没有 IntersectionObserver，靠它触发同一段逻辑）。
+              */}
+              {items.length > visibleCount ? (
+                <div
+                  ref={moreRef}
+                  data-testid="item-list-more"
+                  className="flex flex-col items-center gap-2 py-4"
+                >
+                  <p className="text-[11px] text-fg-faint">
+                    已显示 {visibleCount} / {items.length} 张
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={loadMore}>
+                    加载更多
+                  </Button>
+                </div>
+              ) : null}
+            </>
           )}
         </main>
       </div>

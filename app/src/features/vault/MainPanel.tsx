@@ -537,6 +537,12 @@ export function MainPanel({
   };
 
   const emptySearch = query.trim().length > 0;
+  /**
+   * 「收藏」与「标签」是**筛选视图**，不是分类：它们为空时库里通常还有别的卡片。
+   * 这种空状态如果沿用「还没有资产」，会让用户以为数据丢了（尤其刚导入完、
+   * 点了一下标签却发现一片空白）。
+   */
+  const emptyFilterView = category === 'favorite' || category.startsWith(TAG_NAV_PREFIX);
 
   return (
     <div
@@ -778,10 +784,20 @@ export function MainPanel({
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 rounded-card border border-dashed border-line-strong bg-surface/60 py-16 text-center">
               <p className="text-sm font-medium text-fg-muted">
-                {emptySearch ? '没有匹配的资产' : category === 'hidden' ? '还没有隐藏卡片' : '还没有资产'}
+                {emptySearch
+                  ? '没有匹配的资产'
+                  : category === 'hidden'
+                    ? '还没有隐藏卡片'
+                    : emptyFilterView
+                      ? '这个筛选下还没有资产'
+                      : '还没有资产'}
               </p>
               <p className="text-xs text-fg-faint">
-                {emptySearch ? '换个关键词试试，或清空搜索条件' : '点击右上角「新建卡片」开始'}
+                {emptySearch
+                  ? '换个关键词试试，或清空搜索条件'
+                  : emptyFilterView
+                    ? '切到「全部」看看，或换一个分类 / 标签'
+                    : '点击右上角「新建卡片」开始'}
               </p>
             </div>
           ) : (

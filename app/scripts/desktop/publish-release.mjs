@@ -398,8 +398,45 @@ if (DRY_RUN) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 7.6 换机验收（用户只有一次机会的路径）
+// ---------------------------------------------------------------------------
+
+/**
+ * 为什么也放进发布链路：换机是唯一"错了就没有第二次"的流程——用户手里只有那个
+ * `.kib`，导入坏了就等于丢了整个密码库。而这条路径恰好是 jsdom 最测不到的一段：
+ * 文件有没有真落盘、文件选择框能不能读进来、覆盖导入后**主密码到底换没换**。
+ *
+ * 与视觉验收共用开关（`--skip-visual` / `--skip-build` / `--dry-run` / 找不到浏览器），
+ * 理由相同：复用的产物不代表当前源码，测了反而误导；没有浏览器不该发不了版，但要留痕。
+ */
+console.log(`\n${c.bold}换机验收${c.reset}`);
+if (DRY_RUN) {
+  warn('dry-run 不跑换机验收', '真实发版时会跑（约 90 秒）');
+} else if (SKIP_BUILD) {
+  warn('已跳过', '复用了现有产物，dist 不一定对应当前源码；要校验请去掉 --skip-build');
+} else if (SKIP_VISUAL) {
+  warn('已按 --skip-visual 跳过', '本次发布没有做换机校验');
+} else if (findChrome() === undefined) {
+  warn('未找到 Chrome / Edge，已跳过', '本次发布没有做换机校验（导出/导入剧本没跑）');
+} else {
+  try {
+    execFileSync(process.execPath, [join(APP_ROOT, 'scripts', 'e2e', 'migration.mjs')], {
+      cwd: APP_ROOT,
+      stdio: 'inherit',
+    });
+    ok('换机剧本通过', '导出 → 新机器 → 覆盖导入 / 增量并入');
+  } catch {
+    fail(
+      '换机验收未通过',
+      '导出/导入剧本报错',
+      '先手动跑 `npm run e2e:migration` 看是哪一步断了，修完再发版',
+    );
+  }
+}
+
 if (blockers.length > 0) {
-  console.log(`\n${c.red}视觉验收未通过，已中止（不会发布一个没看过的界面）。${c.reset}\n`);
+  console.log(`\n${c.red}发布前校验未通过，已中止（不会发布一个没验过的版本）。${c.reset}\n`);
   process.exit(1);
 }
 

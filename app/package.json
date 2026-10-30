@@ -26,7 +26,8 @@
     "e2e:settings-shots": "node scripts/e2e/settings-shots.mjs",
     "e2e:contrast": "node scripts/e2e/contrast-audit.mjs",
     "e2e:visual": "node scripts/e2e/settings-shots.mjs && node scripts/e2e/contrast-audit.mjs",
-    "e2e:perf": "node scripts/e2e/perf-1000.mjs"
+    "e2e:perf": "node scripts/e2e/perf-1000.mjs",
+    "e2e:migration": "node scripts/e2e/migration.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

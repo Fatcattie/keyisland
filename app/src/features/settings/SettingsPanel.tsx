@@ -62,6 +62,7 @@ import {
 } from '../../lib/shortcuts';
 import { AuditLogPanel } from './AuditLogPanel';
 import { RotateRecoveryKeyDialog } from './RotateRecoveryKeyDialog';
+import { ExportRecoveryKeyDialog } from './ExportRecoveryKeyDialog';
 
 /**
  * 空映射：自动识别失败时给用户一张"全空"的映射表。
@@ -541,6 +542,7 @@ export function SettingsPanel({
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [auditEntries, setAuditEntries] = useState<readonly AuditEntry[]>([]);
   const [rotateOpen, setRotateOpen] = useState(false);
+  const [exportKirkOpen, setExportKirkOpen] = useState(false);
   /** 热区配置（FR-02）：真值在元数据，这里是一份供预览条渲染的副本。 */
   const [hotzoneConfig, setHotzoneConfig] = useState<HotzoneConfig>(DEFAULT_HOTZONE);
   /** 写回 UI store：灵动岛的命中判定读的是它，改完要立刻生效。 */
@@ -1349,18 +1351,27 @@ export function SettingsPanel({
             }
           />
           {/* PRD FR-08.1：解锁态下可轮换恢复密钥（怀疑泄露时用）。
-              放在「安全」区而不是「数据管理」区：它换的是一把钥匙，不是一份数据。 */}
+              放在「安全」区而不是「数据管理」区：它换的是一把钥匙，不是一份数据。
+              旁边那个「用恢复码生成 .kirk」是**非**轮换路径：不换钥匙，只是把手上那把
+              再写成一个文件（恢复密钥不落盘，所以丢了的 .kirk 无法直接找回）。 */}
           <div className="flex flex-col gap-1.5 border-t border-line-subtle pt-3">
-            <Button variant="secondary" onClick={() => setRotateOpen(true)}>
-              重新生成恢复密钥
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setRotateOpen(true)}>
+                重新生成恢复密钥
+              </Button>
+              <Button variant="secondary" onClick={() => setExportKirkOpen(true)}>
+                用恢复码生成 .kirk
+              </Button>
+            </div>
             <p className="text-[11px] leading-4 text-fg-faint">
-              怀疑恢复码泄露时换一把新的。需要输入主密码，生成后旧恢复码立即失效，主密码不受影响。
+              怀疑恢复码泄露时换一把新的：需要输入主密码，生成后旧恢复码立即失效，主密码不受影响。
+              只是想把恢复密钥再存一份（例如 .kirk 文件丢了但恢复码还在），用旁边那个——它不会更换密钥。
             </p>
           </div>
         </section>
 
         <RotateRecoveryKeyDialog open={rotateOpen} onClose={() => setRotateOpen(false)} />
+        <ExportRecoveryKeyDialog open={exportKirkOpen} onClose={() => setExportKirkOpen(false)} />
 
         <HotzoneSection
           config={hotzoneConfig}

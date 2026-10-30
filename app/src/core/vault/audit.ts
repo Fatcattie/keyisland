@@ -17,7 +17,7 @@
  * 诚实说明：Web 阶段只在内存里，刷新即清空；落盘要等 SQLCipher（ADR-010）。
  */
 
-/** 可记录的动作类型（新增时同步补 `AUDIT_ACTION_LABELS`）。 */
+/** 可记录的动作类型（新增时同步补 `features/settings/AuditLogPanel.tsx` 的 `ACTION_LABELS`）。 */
 export type AuditAction =
   | 'unlock'
   | 'lock'
@@ -30,6 +30,7 @@ export type AuditAction =
   | 'backup.export'
   | 'backup.import'
   | 'recovery.rotate'
+  | 'recovery.export'
   | 'jump';
 
 /** 一条日志。 */

@@ -25,6 +25,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   'backup.export': '导出备份',
   'backup.import': '导入备份',
   'recovery.rotate': '轮换恢复密钥',
+  'recovery.export': '导出恢复密钥',
   jump: '跳转',
 };
 

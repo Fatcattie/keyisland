@@ -21,14 +21,18 @@ import {
   RecencyTracker,
   VaultSession,
   assertMasterPassword,
+  createKirkFile,
   createRecoveryMaterial,
+  formatRecoveryCode,
   generatePassword,
   isValidClipboardTtl,
   isValidClipboardTtlSetting,
   parseKirkFile,
+  recoveryKeyFromCode,
   recoveryKeyFromKirk,
   sanitizeJumpTarget,
   searchItems,
+  serializeKirkFile,
   AuditLog,
   type AuditEntry,
   type AutoLockPolicy,
@@ -120,6 +124,20 @@ export interface RotateRecoveryKeyResult {
   kirkFile: KirkFile;
   kirkJson: string;
   session: SessionSnapshot;
+}
+
+/**
+ * 用恢复码重新铸一份 `.kirk` 的结果。
+ *
+ * 与轮换的区别：**密钥槽一个字节都没动**，产出的 `.kirk` 与用户手上那串恢复码
+ * 完全等价——它既不是新钥匙，也不会让旧钥匙失效。所以这里没有 `session` 字段：
+ * 会话状态没有任何变化。
+ */
+export interface ExportRecoveryKirkResult {
+  /** 规范化（补回分组连字符、修正易混淆字符）后的恢复码，供界面回显。 */
+  recoveryCode: string;
+  kirkFile: KirkFile;
+  kirkJson: string;
 }
 
 /** 备份状态（PRD FR-06「超过 7 天未备份时轻提示」）。 */
@@ -506,6 +524,17 @@ export interface VaultClient {
    * 后落盘，落盘失败就回滚内存里的密钥槽。
    */
   rotateRecoveryKey(masterPassword: string): Promise<RotateRecoveryKeyResult>;
+  /**
+   * 用恢复码重新铸一份 `.kirk` 文件（不是轮换）。
+   *
+   * 存在的原因：恢复密钥**不落盘**（`keyslots.recovery` 里只有用 KEK-B 包住的 DEK），
+   * 所以"把当初下载的那个文件再导一次"在密码学上做不到。手上还留着 32 位恢复码的人
+   * 可以用它在这里重新生成一份等价文件——不写任何持久化状态，也不改密钥槽。
+   *
+   * 先验证后出文件：解不开 B 槽的码一律不产出文件，否则等于发一把假钥匙，
+   * 用户会在最需要它的那天才发现。校验失败会计入恢复失败次数与冷却（与解锁页同一套限流）。
+   */
+  exportRecoveryKirk(recoveryCode: string): Promise<ExportRecoveryKirkResult>;
   /**
    * 备份状态（PRD FR-06）：上次备份时间、距今天数、是否超过 7 天。
    *
@@ -1315,6 +1344,37 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     }
   }
 
+  /**
+   * 用恢复码重新铸一份 `.kirk`（不是轮换）。
+   *
+   * 为什么不复用 `internalRotateRecoveryKey`：那个函数会生成**新的**恢复密钥并重写 B 槽，
+   * 而这里要的是"把用户手上那把钥匙再写成一个文件"——不生成、不落盘、不动密钥槽。
+   *
+   * 校验走 `session.recover(code)`：失败会计入恢复失败次数与冷却期，与解锁页完全同一套
+   * 限流，不存在"在设置里无限次猜恢复码"的旁路。成功后再派生一次密钥用于写文件
+   * （`recover` 内部用完即抹，拿不到明文），两把密钥都在 `finally` 里 `zeroize`。
+   */
+  async function internalExportRecoveryKirk(
+    recoveryCode: string,
+  ): Promise<ExportRecoveryKirkResult> {
+    await ensureLoaded();
+    await session.recover(recoveryCode);
+
+    let recoveryKey: Uint8Array | null = null;
+    try {
+      recoveryKey = await recoveryKeyFromCode(recoveryCode);
+      const kirk = createKirkFile(recoveryKey, clock(), '密岛 KeyIsland 恢复密钥');
+      audit.record('recovery.export');
+      return {
+        recoveryCode: formatRecoveryCode(recoveryCode),
+        kirkFile: kirk,
+        kirkJson: serializeKirkFile(kirk),
+      };
+    } finally {
+      zeroize(recoveryKey);
+    }
+  }
+
   /** 备份状态：以"上次备份时间，从未备份则以库创建时间"为基准算天数。 */
   function computeBackupStatus(): BackupStatus {
     if (meta === null) {
@@ -2069,6 +2129,7 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     setShortcut: (action, spec) => guard(() => internalSetShortcut(action, spec)),
     resetShortcuts: () => guard(internalResetShortcuts),
     rotateRecoveryKey: (masterPassword) => guard(() => internalRotateRecoveryKey(masterPassword)),
+    exportRecoveryKirk: (recoveryCode) => guard(() => internalExportRecoveryKirk(recoveryCode)),
     getBackupStatus: () => guard(internalGetBackupStatus),
     takeBackupReminder: () => guard(internalTakeBackupReminder),
     getAuditLog: (limit) => guard(() => internalGetAuditLog(limit)),

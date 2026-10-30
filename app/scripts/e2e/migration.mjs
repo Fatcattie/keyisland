@@ -33,6 +33,9 @@ const DOWNLOADS = join(ARTIFACTS, 'migration-downloads');
 const MASTER_A = 'MachineA!2026';
 const MASTER_B = 'MachineB!2026';
 const MASTER_C = 'MachineC!2026';
+/** 剧本 D：忘了源库主密码，用恢复密钥重设出来的新密码。 */
+const MASTER_D = 'MachineD!2026';
+const MASTER_D2 = 'MachineD-Recovered!2026';
 const BACKUP_PW = 'Backup!2026-Aa1';
 
 const MIME = {
@@ -227,8 +230,13 @@ async function main() {
     await page.evaluate(HELPERS);
   };
 
-  /** 走完首次设置三步向导。 */
-  const createVault = async (master) => {
+  /**
+   * 走完首次设置三步向导。
+   *
+   * `downloadKirk` 时顺手把第 3 步的 `.kirk` 恢复密钥下载下来——剧本 D 要用它
+   * 在"忘了备份库主密码"的机器上重设密码。返回 `{ ok, kirk }`。
+   */
+  const createVault = async (master, { downloadKirk = false } = {}) => {
     await page.evaluate(`window.__mig.fill('setup-password', ${JSON.stringify(master)})`);
     // 向导第一步可能没有 id：退化成"填前两个输入框"。
     await page.evaluate(`(() => {
@@ -244,14 +252,19 @@ async function main() {
     await page.evaluate(`window.__mig.click('创建保险库')`);
     const ready = await waitForText('恢复码');
     if (!ready) {
-      return false;
+      return { ok: false, kirk: null };
+    }
+    let kirk = null;
+    if (downloadKirk) {
+      await page.evaluate(`window.__mig.click('下载 .kirk 文件')`);
+      kirk = await waitForDownload('.kirk');
     }
     await page.evaluate(
       `(() => { const cb = document.querySelector('input[type=checkbox]'); if (cb) cb.click(); })()`,
     );
     await sleep(300);
     await page.evaluate(`window.__mig.click('进入密岛')`);
-    return waitForText('新建卡片', 30000);
+    return { ok: await waitForText('新建卡片', 30000), kirk };
   };
 
   /** 新建一张卡片（走真实编辑器）。 */
@@ -303,7 +316,15 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════
     console.log('\n── 机器 A：建库、建卡、导出整库备份 ──');
     await switchMachine();
-    check('A：建库完成（三步向导走通）', await createVault(MASTER_A));
+    const setupA = await createVault(MASTER_A, { downloadKirk: true });
+    check('A：建库完成（三步向导走通）', setupA.ok);
+    check(
+      'A：恢复密钥 .kirk 下载成功（剧本 D 要用）',
+      // 判据用文件里真实的 magic，别用文件名：`KIRK1` 是 `recovery.ts` 里的常量，
+      // 文件名改了、内容没变，这条照样成立。
+      setupA.kirk !== null && setupA.kirk.text.includes('KIRK1'),
+      setupA.kirk === null ? '下载目录里没有 .kirk' : setupA.kirk.text.slice(0, 60),
+    );
 
     check(
       'A：新建普通卡片',
@@ -350,7 +371,7 @@ async function main() {
     // ═══════════════════════════════════════════════════════════════
     console.log('\n── 机器 B：新机器 → 覆盖导入 → 主密码应换成 A 的 ──');
     await switchMachine();
-    check('B：新机器建库完成', await createVault(MASTER_B));
+    check('B：新机器建库完成', (await createVault(MASTER_B)).ok);
     check('B：新库里没有卡片', (await page.evaluate('window.__mig.cardCount()')) === 0);
 
     await page.evaluate(`window.__mig.clickExact('设置')`);
@@ -429,7 +450,7 @@ async function main() {
     }
 
     await switchMachine();
-    check('C：新机器建库完成', await createVault(MASTER_C));
+    check('C：新机器建库完成', (await createVault(MASTER_C)).ok);
     await page.evaluate(`window.__mig.clickExact('设置')`);
     await waitForText('备份与恢复');
     await page.evaluate(`window.__mig.click('资产批量迁移')`);
@@ -476,6 +497,75 @@ async function main() {
       'C：主密码仍是 C 的（增量导入没有替换密钥槽）',
       await waitForCards(2, 30000),
     );
+
+    // ═══════════════════════════════════════════════════════════════
+    // 机器 D：导入回来了，但忘了源库主密码 → 用 .kirk 重设
+    // ═══════════════════════════════════════════════════════════════
+    // 这是换机剧本里最绝望的一半：`.kib` 导进来了，但想不起备份库的主密码。
+    // 恢复密钥是唯一出路，所以它必须真的能用——用户指南里就是这么写的。
+    console.log('\n── 机器 D：忘了源库主密码 → 用 .kirk 恢复密钥重设 ──');
+    await switchMachine();
+    check('D：新机器建库完成', (await createVault(MASTER_D)).ok);
+
+    await page.evaluate(`window.__mig.clickExact('设置')`);
+    await waitForText('备份与恢复');
+    await page.evaluate(`window.__mig.click('导入完整备份')`);
+    await sleep(400);
+    if (kib !== null) {
+      await page.send('DOM.enable');
+      const doc = await page.send('DOM.getDocument', { depth: -1 });
+      const node = await page.send('DOM.querySelector', {
+        nodeId: doc.root.nodeId,
+        selector: '#settings-backup-file',
+      });
+      await page.send('DOM.setFileInputFiles', { files: [kib.path], nodeId: node.nodeId });
+      await sleep(600);
+    }
+    await page.evaluate(`window.__mig.fill('settings-import-password', ${JSON.stringify(BACKUP_PW)})`);
+    await page.evaluate(`window.__mig.select('settings-import-mode', 'overwrite')`);
+    await sleep(400);
+    await page.evaluate(`window.__mig.fill('settings-import-confirm', '覆盖')`);
+    await page.evaluate(`window.__mig.fill('settings-import-master', ${JSON.stringify(MASTER_D)})`);
+    await sleep(300);
+    await page.evaluate(`window.__mig.click('开始导入')`);
+    check('D：导入完成并回到锁定态', await waitForText('解锁', 20000));
+
+    // 假装想不起 A 的主密码：走恢复流程，用 A 机器当初下载的 .kirk。
+    await page.evaluate(`window.__mig.click('忘记密码')`);
+    check('D：进入恢复流程', await waitForText('用恢复凭据验证身份'));
+    if (setupA.kirk !== null) {
+      await page.send('DOM.enable');
+      const doc = await page.send('DOM.getDocument', { depth: -1 });
+      const node = await page.send('DOM.querySelector', {
+        nodeId: doc.root.nodeId,
+        selector: '#recovery-kirk-file',
+      });
+      await page.send('DOM.setFileInputFiles', { files: [setupA.kirk.path], nodeId: node.nodeId });
+      await sleep(700);
+    }
+    const credentialLength = await page.evaluate(
+      `(window.__mig.byId('recovery-credential') || {}).value?.length ?? 0`,
+    );
+    check('D：.kirk 文件内容被读进恢复凭据', credentialLength > 50, `长度 ${credentialLength}`);
+
+    await page.evaluate(`window.__mig.clickExact('验证')`);
+    check('D：恢复凭据验证通过，进入设置新密码', await waitForText('设置新的主密码', 20000));
+    await page.evaluate(`window.__mig.fill('recovery-new-password', ${JSON.stringify(MASTER_D2)})`);
+    await page.evaluate(`window.__mig.fill('recovery-confirm', ${JSON.stringify(MASTER_D2)})`);
+    await sleep(200);
+    await page.evaluate(`window.__mig.click('重设主密码')`);
+    check('D：重设后回到锁定态（必须用新密码解锁）', await waitForText('解锁', 30000));
+
+    await unlock(MASTER_D2);
+    check('D：用新主密码解锁成功，卡片都在', await waitForCards(2, 30000));
+
+    // 再锁一次验旧密码真的废了：否则"重设成功"可能只是会话没换。
+    await page.evaluate(`window.__mig.clickExact('锁定')`);
+    await waitForText('解锁', 20000);
+    await unlock(MASTER_A);
+    check('D：源库的旧主密码已失效', await waitForText('主密码不正确', 20000));
+    await unlock(MASTER_D2);
+    check('D：新主密码仍然可用', await waitForCards(2, 30000));
 
     const errors = page.consoleErrors();
     check('全程无 console 错误', errors.length === 0, errors.slice(0, 3).join(' | '));

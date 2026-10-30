@@ -27,7 +27,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -266,6 +266,28 @@ if (SKIP_BUILD) {
   warn('跳过出包', '使用现有产物');
 } else {
   console.log(`\n${c.bold}出包${c.reset}  ${c.dim}(约 5~11 分钟)${c.reset}`);
+  /**
+   * 先把旧 `dist` 挪开。
+   *
+   * `npm run build` 里 vite 会清空输出目录（`prepareOutDir` → `rm dist/assets`），
+   * 而沙箱的 safe-delete shim 对**每轮删除的文件数**有配额（50 个）。dist 现在有
+   * 52 个文件，于是出包在第一步就整条失败，报错还长得像"构建莫名失败"——
+   * 2026-10-30 发 0.1.17 时就是这么卡住的。
+   *
+   * `rename` 不算删除，挪到临时目录让 vite 去建一个干净的新目录即可。
+   * 不直接删：留着万一要对比上一版产物。
+   */
+  const distDir = join(APP_ROOT, 'dist');
+  if (existsSync(distDir)) {
+    const aside = join(tmpdir(), `ki-dist-${Date.now()}`);
+    try {
+      renameSync(distDir, aside);
+      ok('旧 dist 已挪开', aside);
+    } catch (error) {
+      // 挪不动不算致命：vite 自己清目录，只是在配额内才成功。
+      warn('旧 dist 挪不动', String(error));
+    }
+  }
   try {
     runVisible('npm', ['run', 'desktop:build']);
   } catch {

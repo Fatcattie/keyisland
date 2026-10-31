@@ -140,7 +140,7 @@
     <div class="hero-inner">
       <span class="badge">KeyIsland · 终端用户手册</span>
       <h1>密岛 · 操作指引与功能说明</h1>
-      <p>本地加密的密码保险库 —— 无云端、无服务器、无后门。本手册讲清每个功能是什么、怎么一步步用。适用版本 v0.1.13。</p>
+      <p>本地加密的密码保险库 —— 无云端、无服务器、无后门。本手册讲清每个功能是什么、怎么一步步用。适用版本 v0.1.20。</p>
       <div class="tags">
         <span class="tag">本地优先</span>
         <span class="tag">SQLCipher 加密</span>
@@ -433,6 +433,82 @@
           <li><b>忘了备份库的主密码怎么办</b>：导入后主密码就是<b>备份库那个</b>。想不起来时在<b>解锁页</b>点「忘记密码？」，进入恢复流程：选 <code>.kirk</code> 文件（或直接粘贴 32 位恢复码）→「验证」→ 设置新主密码。重设只重写密码槽，恢复码继续有效。恢复密钥跟着 <code>.kib</code> 一起搬过去了，所以它在<b>新机器上同样有效</b>；反过来，新机器原来那张恢复码会随之失效。</li>
           <li>别把两件事搞混：<b>「忘记密码？」是找回</b>（在解锁页）；<b>设置 →「重新生成恢复密钥」是轮换</b>（怀疑泄露时用）。轮换会让旧恢复码立刻失效，记得把新的 <code>.kirk</code> 重新存好。</li>
         </ul>
+        <h3>换机原理：保险箱 + 两把锁（大白话）</h3>
+        <p>很多人以为"换电脑"是把数据传到某个服务器再下载回来——<b>密岛不是</b>，整件事纯本地，你就是搬运工。用个比喻讲清楚：</p>
+        <blockquote style="margin:14px 0;padding:12px 16px;border-left:3px solid var(--accent,#1e3a8a);background:var(--surface,#f7f8fa);border-radius:0 10px 10px 0;color:var(--text-muted,#5a6675);font-size:14px">你的账密装在一个<b>保险箱</b>里，箱子用一把随机生成的<b>总钥匙（DEK）</b>锁着。总钥匙不能裸奔，被塞进两个小铁盒分别锁好：<b>A 盒</b>用"你的主密码"开，<b>B 盒</b>用"恢复密钥（恢复码 / <code>.kirk</code>）"开。这两个盒子 + 保险箱，就是电脑里的<b>本地加密库</b>。总钥匙（DEK）是随机掷出来的，跟你密码长啥样<b>没关系</b>；改密码只是换 A 盒的锁，轮换恢复密钥只是换 B 盒的锁，保险箱纹丝不动。</blockquote>
+        <figure style="margin:18px 0">
+          <svg viewBox="0 0 980 650" role="img" aria-label="换机原理示意：旧机器把保险箱与两锁盒导出为 .kib，恢复密钥导出为 .kirk，人肉搬运到新机器后本地解锁" style="width:100%;height:auto;max-width:780px;display:block;margin:0 auto">
+            <defs>
+              <marker id="ki-arrow" viewBox="0 0 10 10" refX="8" refY="3" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L8,3 L0,6 Z" style="fill:var(--text-subtle,#8a93a3)"></path>
+              </marker>
+            </defs>
+
+            <text x="480" y="30" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:15px;font-weight:700">① 旧机器 · 本地加密库</text>
+
+            <rect x="350" y="48" width="260" height="66" rx="12" style="fill:var(--ki-teal,#0e7490);fill-opacity:.12;stroke:var(--ki-teal,#0e7490);stroke-width:1.6"></rect>
+            <text x="480" y="78" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:14px;font-weight:700">保险箱</text>
+            <text x="480" y="100" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12.5px">全部账密（DEK 加密）</text>
+
+            <rect x="300" y="150" width="140" height="62" rx="10" style="fill:var(--ki-night,#1e3a8a);fill-opacity:.10;stroke:var(--ki-night,#1e3a8a);stroke-width:1.6"></rect>
+            <text x="370" y="178" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">A 盒</text>
+            <text x="370" y="198" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12px">主密码锁</text>
+
+            <rect x="520" y="150" width="140" height="62" rx="10" style="fill:var(--ki-night,#1e3a8a);fill-opacity:.10;stroke:var(--ki-night,#1e3a8a);stroke-width:1.6"></rect>
+            <text x="590" y="178" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">B 盒</text>
+            <text x="590" y="198" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12px">恢复密钥锁</text>
+
+            <rect x="730" y="150" width="170" height="62" rx="10" style="fill:var(--ki-amber,#fbbf24);fill-opacity:.16;stroke:var(--ki-amber,#fbbf24);stroke-width:1.6"></rect>
+            <text x="815" y="178" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">恢复密钥</text>
+            <text x="815" y="198" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:11.5px">恢复码 / .kirk 的本质</text>
+
+            <rect x="350" y="250" width="260" height="60" rx="10" style="fill:var(--ki-amber,#fbbf24);fill-opacity:.16;stroke:var(--ki-amber,#fbbf24);stroke-width:1.6"></rect>
+            <text x="480" y="278" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">.kib</text>
+            <text x="480" y="298" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12px">保险箱 + A盒 + B盒</text>
+
+            <rect x="730" y="250" width="170" height="60" rx="10" style="fill:var(--ki-amber,#fbbf24);fill-opacity:.16;stroke:var(--ki-amber,#fbbf24);stroke-width:1.6"></rect>
+            <text x="815" y="278" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">.kirk</text>
+            <text x="815" y="298" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12px">B 盒钥匙纸</text>
+
+            <path d="M480,114 L370,150" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M480,114 L590,150" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M370,212 L430,250" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M590,212 L530,250" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M730,181 L660,181" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M815,212 L815,250" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+
+            <rect x="300" y="330" width="620" height="40" rx="20" style="fill:var(--surface-2,#eef1f5);stroke:var(--border,#e3e7ec);stroke-width:1.2"></rect>
+            <text x="610" y="355" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">人肉搬运：U 盘 / 邮件 / 微信 · 全程不联网</text>
+
+            <text x="480" y="400" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:15px;font-weight:700">② 新机器 · 本地自己开（不联网）</text>
+
+            <rect x="350" y="412" width="300" height="56" rx="10" style="fill:var(--surface,#f7f8fa);stroke:var(--accent,#1e3a8a);stroke-width:1.6"></rect>
+            <text x="500" y="438" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">载入 .kib</text>
+            <text x="500" y="458" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12px">保险箱 + 两锁盒</text>
+
+            <rect x="350" y="492" width="300" height="64" rx="10" style="fill:var(--ki-teal,#0e7490);fill-opacity:.12;stroke:var(--ki-teal,#0e7490);stroke-width:1.6"></rect>
+            <text x="500" y="520" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">用 .kirk 开 B 盒</text>
+            <text x="500" y="542" text-anchor="middle" style="fill:var(--text-muted,#5a6675);font-size:12px">→ 取出 DEK</text>
+
+            <rect x="350" y="578" width="300" height="56" rx="10" style="fill:var(--ki-teal,#0e7490);fill-opacity:.12;stroke:var(--ki-teal,#0e7490);stroke-width:1.6"></rect>
+            <text x="500" y="611" text-anchor="middle" style="fill:var(--text,#1c2430);font-size:13.5px;font-weight:700">用 DEK 开保险箱 → 账密全部回来</text>
+
+            <path d="M480,310 L480,412" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M815,310 L660,492" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M500,468 L500,492" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+            <path d="M500,556 L500,578" style="stroke:var(--text-subtle,#8a93a3);stroke-width:1.6;fill:none" marker-end="url(#ki-arrow)"></path>
+          </svg>
+          <figcaption style="font-size:12.5px;color:var(--text-subtle,#8a93a3);margin-top:6px;text-align:center">换机原理：旧机器导出 .kib（保险箱+两锁盒）与 .kirk（B 盒钥匙纸），人肉搬运到新机器后本地解锁，全程不联网。</figcaption>
+        </figure>
+        <p><b>一步步看（对应上面的图）：</b></p>
+        <ol>
+          <li><b>旧机器建库</b>：随机生成 DEK → 账密用 DEK 加密进保险箱；DEK 被 A 盒（主密码）、B 盒（恢复密钥）分别锁住，一并存进本地库。</li>
+          <li><b>导出两份文件</b>：<code>.kib</code> = 整个保险箱 + 两个锁盒（里面是被锁住的 DEK，不是 DEK 本身）；<code>.kirk</code> = 一小张纸，只写 B 盒钥匙（恢复密钥）。</li>
+          <li><b>人肉搬运</b>：U 盘 / 邮件都行。<code>.kib</code> 和 <code>.kirk</code> 本身就是加密 / 无意义的，丢了也不怕（前提是你没把主密码也写上去）。<b>全程没有服务器参与</b>——<code>ipc.localhost</code> 只是程序内部前后端通信（本机回环），绝非第三方接口。</li>
+          <li><b>新机器借尸还魂</b>：新机器载入 <code>.kib</code>（得到保险箱 + 两锁盒）和 <code>.kirk</code>（B 盒钥匙）→ 用 <code>.kirk</code> 开 B 盒取出 DEK → 用 DEK 开保险箱 → 账密回来。</li>
+        </ol>
+        <div class="callout"><b>为什么安全</b>：<code>.kirk</code> 泄露 ≠ 库泄露——光有 B 盒钥匙没用，还得有 <code>.kib</code> 里的 B 盒才开得了；恢复密钥用完即销毁，库里从头到尾不存它。磁盘上只有被两道锁锁住的 DEK 密文，没有主密码 / 恢复密钥就解不开；想暴力猜密码，每次都要先花 64 MiB 内存跑 3 轮 Argon2id，大规模硬猜成本很高。</div>
+
         <h3>换电脑：一份四步清单</h3>
         <p>换机最容易漏的不是导出，是<b>导出之后那几样东西没凑齐</b>。按顺序走：</p>
         <ol>
@@ -510,7 +586,7 @@
   </div>
 
   <footer>
-    密岛 KeyIsland · 终端用户手册（v0.1.13） · 本地优先的加密密码管理器
+    密岛 KeyIsland · 终端用户手册（v0.1.20） · 本地优先的加密密码管理器
   </footer>
 
   <script>

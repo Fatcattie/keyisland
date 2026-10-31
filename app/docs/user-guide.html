@@ -538,20 +538,37 @@
 
       <section id="s16">
         <h2><span class="num">16</span>快捷键与高效操作一览</h2>
+        <div class="callout">
+          <b>快捷键可自定义</b>：下方操作表里标 ✅「可改」的四个应用内动作——聚焦搜索、复制密码、复制账号、打开跳转——都能在 <b>设置 → 快捷键</b> 里改。每个动作给几个候选组合键（下拉框选），若与别的动作冲突会被自动置灰；改完即时生效、随库保存，也可一键「恢复默认」。<br>
+          <b>固定不开放</b>（标「固定」）：↑↓ 列表导航与 Esc 收起浮层是 WAI-ARIA 无障碍规范 / 浏览器原生行为，改了会让读屏用户失去预期，因此不可改。全局热键（唤出灵动岛 / 立即锁定）属于系统级绑定，Web 版无法注册、桌面版按系统约定，也不开放自定义。
+        </div>
+        <h3>可自定义的四个快捷键（默认组合键）</h3>
         <table>
-          <thead><tr><th>位置</th><th>操作</th><th>效果</th></tr></thead>
+          <thead><tr><th>动作</th><th>默认键</th><th>在哪里改</th></tr></thead>
           <tbody>
-            <tr><td>主面板</td><td><span class="kbd">/</span></td><td>聚焦搜索框</td></tr>
-            <tr><td>主面板</td><td>按住卡片上的密码</td><td>临时显形，松开即隐藏</td></tr>
-            <tr><td>主面板</td><td>点 ☆</td><td>收藏 / 取消收藏</td></tr>
-            <tr><td>灵动岛</td><td>鼠标推到屏幕<b>上沿</b></td><td>唤出收起的胶囊；点一下展开</td></tr>
-            <tr><td>灵动岛</td><td>滚轮向下 / 向上</td><td>唤出滑动线，从第一张 / 最后一张开始翻</td></tr>
-            <tr><td>滑动线</td><td><span class="kbd">Enter</span></td><td>复制当前卡片密码</td></tr>
-            <tr><td>滑动线</td><td><span class="kbd">Shift</span> + <span class="kbd">Enter</span></td><td>复制当前卡片账号</td></tr>
-            <tr><td>滑动线</td><td><b>鼠标中键</b></td><td>退出滑动线，回到灵动岛面板</td></tr>
-            <tr><td>滑动线</td><td><span class="kbd">Esc</span></td><td>关闭滑动线（不收岛）</td></tr>
-            <tr><td>灵动岛</td><td>右键</td><td>打开主面板 / 锁定 / 退出</td></tr>
-            <tr><td>主面板</td><td>左导航底部开关</td><td>白天 ⇄ 黑夜主题</td></tr>
+            <tr><td>聚焦搜索框</td><td><span class="kbd">/</span></td><td>设置 → 快捷键</td></tr>
+            <tr><td>复制密码</td><td><span class="kbd">Enter</span></td><td>设置 → 快捷键</td></tr>
+            <tr><td>复制账号</td><td><span class="kbd">Shift</span> + <span class="kbd">Enter</span></td><td>设置 → 快捷键</td></tr>
+            <tr><td>打开跳转目标</td><td><span class="kbd">Ctrl</span> + <span class="kbd">Enter</span></td><td>设置 → 快捷键</td></tr>
+          </tbody>
+        </table>
+        <h3>全部操作一览</h3>
+        <table>
+          <thead><tr><th>位置</th><th>操作</th><th>效果</th><th>自定义</th></tr></thead>
+          <tbody>
+            <tr><td>主面板</td><td><span class="kbd">/</span> ✅</td><td>聚焦搜索框</td><td>可改</td></tr>
+            <tr><td>主面板</td><td>按住卡片上的密码</td><td>临时显形，松开即隐藏</td><td>—</td></tr>
+            <tr><td>主面板</td><td>点 ☆</td><td>收藏 / 取消收藏</td><td>—</td></tr>
+            <tr><td>灵动岛</td><td>鼠标推到屏幕<b>上沿</b></td><td>唤出收起的胶囊；点一下展开</td><td>—</td></tr>
+            <tr><td>灵动岛</td><td>滚轮向下 / 向上</td><td>唤出滑动线，从第一张 / 最后一张开始翻</td><td>—</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Enter</span> ✅</td><td>复制当前卡片密码</td><td>可改</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Shift</span> + <span class="kbd">Enter</span> ✅</td><td>复制当前卡片账号</td><td>可改</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Ctrl</span> + <span class="kbd">Enter</span> ✅</td><td>打开跳转目标</td><td>可改</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">↑</span> / <span class="kbd">↓</span> 固定</td><td>上一张 / 下一张卡片</td><td>固定</td></tr>
+            <tr><td>滑动线</td><td><b>鼠标中键</b></td><td>退出滑动线，回到灵动岛面板</td><td>—</td></tr>
+            <tr><td>滑动线</td><td><span class="kbd">Esc</span> 固定</td><td>关闭滑动线（不收岛）</td><td>固定</td></tr>
+            <tr><td>灵动岛</td><td>右键</td><td>打开主面板 / 锁定 / 退出</td><td>—</td></tr>
+            <tr><td>主面板</td><td>左导航底部开关</td><td>白天 ⇄ 黑夜主题</td><td>—</td></tr>
           </tbody>
         </table>
       </section>

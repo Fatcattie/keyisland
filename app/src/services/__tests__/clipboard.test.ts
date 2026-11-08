@@ -208,17 +208,20 @@ describe('剪贴板服务', () => {
     expect(port.clearCount).toBe(1);
   });
 
-  it('多次复制各自独立结算', async () => {
+  it('连续复制：后一次取代前一次，前一次的到期不会清掉后一次的内容', async () => {
     const { port, service, scheduler } = setup();
     const first = await service.copyWithTtl('first-value', 1_000);
     const second = await service.copyWithTtl('second-value', 2_000);
 
-    expect(service.pendingCount()).toBe(2);
+    // 同一时刻只有一个任务拥有剪贴板：旧任务被取代并取消定时器。
+    // （原先两个任务并存，旧任务到期时若读不到剪贴板会强制清空，抹掉新复制的内容。）
+    expect(service.pendingCount()).toBe(1);
     expect(first.token).not.toBe(second.token);
+    expect(scheduler.timers[0].cancelled).toBe(true);
+    expect(service.getOutcomes()[0]).toMatchObject({ token: first.token, outcome: 'superseded' });
 
     scheduler.fire(0);
     await service.awaitPending();
-    // 第一个任务发现剪贴板已被第二次复制覆盖，跳过清理
     expect(port.content).toBe('second-value');
 
     scheduler.fire(1);

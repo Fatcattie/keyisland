@@ -1,10 +1,11 @@
 /**
  * 存储端口。
  *
- * 本轮只实现 `MemoryVaultStorage`：
- * - 应用重启后数据消失，仅用于开发态与测试。
+ * 本文件提供端口定义与 `MemoryVaultStorage`：
+ * - 内存实现在应用重启后数据消失，仅用于浏览器预览、开发态与测试。
  * - 明确禁止用 localStorage / sessionStorage 保存密码、密钥或密文（SDD §0.3）。
- * - Phase 1.5 迁移 SQLCipher 时，`VaultStorage` 的接口语义必须保持不变（见 ADR-010）。
+ * - 桌面实现见 `tauri-storage.ts`（SQLite + 每值 AES-256-GCM），两者的接口语义必须一致（见 ADR-010），
+ * 由 `__tests__/support/storage-contract.ts` 的共享契约约束。
  */
 
 import { errors } from '../core/errors';
@@ -81,7 +82,7 @@ export interface VaultMeta {
  * 数据文件位置描述（PRD FR-06「设置页展示数据文件路径与打开所在文件夹」）。
  *
  * 诚实原则：当前内存存储**没有**文件路径，也不假装有——`displayPath` 为 null、
- * `canReveal` 为 false，UI 据此禁用"打开所在文件夹"并说明原因。等 SQLCipher
+ * `canReveal` 为 false，UI 据此禁用"打开所在文件夹"并说明原因。桌面版 SQLite
  * 落库实现返回真实路径与可打开状态，UI 无需改动即自动生效。
  */
 export interface StorageLocation {
@@ -92,12 +93,103 @@ export interface StorageLocation {
   canReveal: boolean;
 }
 
+/**
+ * 一次**原子**写入（ADR-010 补充：多键写入必须同生同死）。
+ *
+ * 出现的段才会被写；未出现的段保持原样。`items` 出现时是**整体替换**
+ * （库里不在列表中的卡片会被删掉），用于初始化、覆盖导入、合并导入这类
+ * "整库换新"的场景；单卡增删改走 {@link ItemChangeSet}。
+ *
+ * 为什么不是前端 `try { saveA; saveB } catch { 反向写回 }`：补偿写入扛不住断电、
+ * 进程被杀，也可能再次撞上同一个磁盘故障。新密钥槽落盘而旧资产没换，
+ * 库就再也解不开了。实现方必须保证：要么全部生效，要么一个都不生效。
+ */
+export interface VaultWriteBatch {
+  keyslots?: KeyslotsBundle;
+  meta?: VaultMeta;
+  /** 整体替换全部资产。 */
+  items?: EncryptedItemRecord[];
+  recency?: RecentEntry[];
+}
+
+/**
+ * 资产增量变更：只写变化的那几张卡片（任务 5，单卡修改不重写整库）。
+ *
+ * 同样是原子的——批量删除 / 批量导入要么全部落盘，要么一条都不落。
+ * 同一个 id 同时出现在 `upserts` 与 `deletes` 里视为调用方错误，直接拒绝。
+ */
+export interface ItemChangeSet {
+  upserts: EncryptedItemRecord[];
+  deletes: number[];
+}
+
+/** 校验写入批次的结构；任何一段不合法都整体拒绝，不落半截。 */
+export function assertValidBatch(batch: VaultWriteBatch): void {
+  if (batch === null || typeof batch !== 'object') {
+    throw errors.storageFailed();
+  }
+  if (batch.keyslots !== undefined && !isKeyslotsBundle(batch.keyslots)) {
+    throw errors.storageFailed();
+  }
+  if (batch.meta !== undefined && (batch.meta === null || typeof batch.meta !== 'object')) {
+    throw errors.storageFailed();
+  }
+  if (batch.items !== undefined) {
+    assertValidRecords(batch.items);
+  }
+  if (batch.recency !== undefined && !Array.isArray(batch.recency)) {
+    throw errors.storageFailed();
+  }
+}
+
+/** 记录 id 必须是非负安全整数：它同时是 AAD 的一部分与存储行的身份。 */
+export function isValidItemId(id: unknown): id is number {
+  return typeof id === 'number' && Number.isSafeInteger(id) && id >= 0;
+}
+
+function assertValidRecords(records: unknown): asserts records is EncryptedItemRecord[] {
+  if (!Array.isArray(records)) {
+    throw errors.storageFailed();
+  }
+  const seen = new Set<number>();
+  for (const record of records) {
+    if (record === null || typeof record !== 'object' || !isValidItemId((record as EncryptedItemRecord).id)) {
+      throw errors.storageFailed();
+    }
+    const id = (record as EncryptedItemRecord).id;
+    // 同一批里出现两次同一个 id，后写的会静默盖掉先写的——这是调用方的 bug，不替它选。
+    if (seen.has(id)) {
+      throw errors.storageFailed();
+    }
+    seen.add(id);
+  }
+}
+
+/** 校验增量变更的结构。 */
+export function assertValidChangeSet(changes: ItemChangeSet): void {
+  if (changes === null || typeof changes !== 'object' || !Array.isArray(changes.deletes)) {
+    throw errors.storageFailed();
+  }
+  assertValidRecords(changes.upserts);
+  const upsertIds = new Set(changes.upserts.map((record) => record.id));
+  for (const id of changes.deletes) {
+    if (!isValidItemId(id) || upsertIds.has(id)) {
+      throw errors.storageFailed();
+    }
+  }
+}
+
 /** 存储端口。 */
 export interface VaultStorage {
   loadKeyslots(): Promise<KeyslotsBundle | null>;
   saveKeyslots(keyslots: KeyslotsBundle): Promise<void>;
   loadItems(): Promise<EncryptedItemRecord[]>;
+  /** 整体替换全部资产，等价于 `commit({ items: records })`。 */
   saveItems(records: EncryptedItemRecord[]): Promise<void>;
+  /** 原子地写入或删除若干张卡片；未提及的卡片不被读、不被写。 */
+  applyItemChanges(changes: ItemChangeSet): Promise<void>;
+  /** 原子地写入多段数据（见 {@link VaultWriteBatch}）。 */
+  commit(batch: VaultWriteBatch): Promise<void>;
   loadMeta(): Promise<VaultMeta | null>;
   saveMeta(meta: VaultMeta): Promise<void>;
   loadRecency(): Promise<RecentEntry[]>;
@@ -146,10 +238,44 @@ export class MemoryVaultStorage implements VaultStorage {
   }
 
   async saveItems(records: EncryptedItemRecord[]): Promise<void> {
-    if (!Array.isArray(records)) {
-      throw errors.storageFailed();
+    await this.commit({ items: records });
+  }
+
+  async applyItemChanges(changes: ItemChangeSet): Promise<void> {
+    assertValidChangeSet(changes);
+    // 先在副本上算出结果，最后一次赋值——中途抛错时 `this.items` 一点没动。
+    const byId = new Map(this.items.map((record) => [record.id, record]));
+    for (const id of changes.deletes) {
+      byId.delete(id);
     }
-    this.items = cloneJson(records);
+    for (const record of cloneJson(changes.upserts)) {
+      byId.set(record.id, record);
+    }
+    this.items = [...byId.values()];
+  }
+
+  async commit(batch: VaultWriteBatch): Promise<void> {
+    assertValidBatch(batch);
+    // 全部段先深拷贝（可能抛错的步骤都在这里），然后同步地依次赋值：
+    // 赋值之间没有 await，不存在"写了一半被别的调用看到"的窗口。
+    const next = {
+      keyslots: batch.keyslots === undefined ? undefined : cloneJson(batch.keyslots),
+      meta: batch.meta === undefined ? undefined : cloneJson(batch.meta),
+      items: batch.items === undefined ? undefined : cloneJson(batch.items),
+      recency: batch.recency === undefined ? undefined : cloneJson(batch.recency),
+    };
+    if (next.keyslots !== undefined) {
+      this.keyslots = next.keyslots;
+    }
+    if (next.meta !== undefined) {
+      this.meta = next.meta;
+    }
+    if (next.items !== undefined) {
+      this.items = next.items;
+    }
+    if (next.recency !== undefined) {
+      this.recency = next.recency;
+    }
   }
 
   async loadMeta(): Promise<VaultMeta | null> {

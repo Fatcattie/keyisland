@@ -1,5 +1,9 @@
 # 密岛 KeyIsland · Web 预览版发布说明
 
+> **历史文档**：本文写于 Web 预览阶段，其中"桌面版尚在评估""无持久化""SQLCipher 未接入"等描述
+> 只适用于当时。桌面版（Tauri 2，SQLite + 每值 AES-256-GCM 落盘）现已实现，当前说明见
+> [`README.md`](README.md) 与 [`docs/DESKTOP-BUILD.md`](docs/DESKTOP-BUILD.md)。
+
 > 适用对象：想把本仓库作为 **Web 预览版** 跑起来 / 交付给别人试用的场景。
 > 对应设计文档：`../SDD.md`、`../prd.md`、`docs/PHASE-LOG.md`、`docs/adr/ADR-014-*`（Tauri 接入评估）。
 

@@ -6,6 +6,8 @@
  */
 
 import { useEffect, useState } from 'react';
+import { IMPORT_LIMITS, formatLimit, isImportLimitError } from '../../core/vault/import-limits';
+import { readTextFile } from '../../lib/read-text-file';
 import { Button } from '../../components/ui/Button';
 import { Field, INPUT_CLASS } from '../../components/ui/Field';
 import { Modal } from '../../components/ui/Modal';
@@ -1049,14 +1051,7 @@ export function SettingsPanel({
 
   const handlePickAssetBundle = async (file: File): Promise<void> => {
     try {
-      const text = typeof file.text === 'function'
-        ? await file.text()
-        : await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (): void => resolve(typeof reader.result === 'string' ? reader.result : '');
-            reader.onerror = (): void => reject(new Error('无法读取该文件'));
-            reader.readAsText(file);
-          });
+      const text = await readTextFile(file, IMPORT_LIMITS.assetBundleMaxBytes);
       // 选错文件是最常见的操作失误：.kib 是完整库备份，语义完全不同，
       // 直接说清楚该去哪儿，比让用户在"解密失败"里猜要好。
       if (isBackupEnvelope(text)) {
@@ -1067,26 +1062,18 @@ export function SettingsPanel({
       setBundleImportText(text);
       setBundlePreview(null);
       setBundlePreviewError(null);
-    } catch {
-      toast('无法读取该文件，请确认它是 .kia 加密资产包');
+    } catch (caught) {
+      toast(
+        isImportLimitError(caught)
+          ? `${describeError(caught)}（资产包上限 ${formatLimit(IMPORT_LIMITS.assetBundleMaxBytes)}）`
+          : '无法读取该文件，请确认它是 .kia 加密资产包',
+      );
     }
   };
 
   const handlePickFile = async (file: File): Promise<void> => {
     try {
-      const text =
-        typeof file.text === 'function'
-          ? await file.text()
-          : await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = (): void => {
-                resolve(typeof reader.result === 'string' ? reader.result : '');
-              };
-              reader.onerror = (): void => {
-                reject(new Error('无法读取该文件'));
-              };
-              reader.readAsText(file);
-            });
+      const text = await readTextFile(file, IMPORT_LIMITS.backupMaxBytes);
       // 反向同理：把资产包塞进完整恢复，用户只会看到"备份无效"。
       if (isAssetTransferEnvelope(text)) {
         setImportText('');
@@ -1094,27 +1081,19 @@ export function SettingsPanel({
         return;
       }
       setImportText(text);
-    } catch {
-      toast('无法读取该文件，请确认它是 .kib 备份');
+    } catch (caught) {
+      toast(
+        isImportLimitError(caught)
+          ? `${describeError(caught)}（备份上限 ${formatLimit(IMPORT_LIMITS.backupMaxBytes)}）`
+          : '无法读取该文件，请确认它是 .kib 备份',
+      );
     }
   };
 
   /** 选择 CSV 文件后预解析，给出条目数与被跳过的行（不展示任何密码）。 */
   const handleCsvFile = async (file: File): Promise<void> => {
     try {
-      const text =
-        typeof file.text === 'function'
-          ? await file.text()
-          : await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = (): void => {
-                resolve(typeof reader.result === 'string' ? reader.result : '');
-              };
-              reader.onerror = (): void => {
-                reject(new Error('无法读取该文件'));
-              };
-              reader.readAsText(file);
-            });
+      const text = await readTextFile(file, IMPORT_LIMITS.csvMaxBytes);
       setCsvText(text);
       setCsvError(null);
       setCsvPreview(null);
@@ -1141,8 +1120,12 @@ export function SettingsPanel({
         setCsvMapping(blankCsvMapping());
         setCsvError('没能自动识别列名，请在下方手动指定名称、账号和密码');
       }
-    } catch {
-      setCsvError('无法读取该文件，请确认它是 CSV 格式');
+    } catch (caught) {
+      setCsvError(
+        isImportLimitError(caught)
+          ? `${describeError(caught)}（CSV 上限 ${formatLimit(IMPORT_LIMITS.csvMaxBytes)}、${IMPORT_LIMITS.maxItems} 行）`
+          : '无法读取该文件，请确认它是 CSV 格式',
+      );
     }
   };
 
@@ -1393,13 +1376,14 @@ export function SettingsPanel({
 
         <section className="flex flex-col gap-2 rounded-card border border-line bg-surface-muted p-4">
           <h3 className="text-xs font-semibold text-fg">数据说明</h3>
-          <p className="text-[11px] leading-5 text-fg-subtle">
-            当前版本使用内存存储：刷新或关闭页面即清空全部数据，不会写入磁盘。
-            Tauri + SQLCipher 接入后才会持久化（见 ADR-010）。
+          <p className="text-[11px] leading-5 text-fg-subtle" data-testid="storage-explainer">
+            {storageLocation?.kind === 'file'
+              ? '数据保存在本机 SQLite 数据库，每一项都单独以 AES-256-GCM 加密；解开数据库的密钥存在本机 Windows 凭据管理器里。单独拷走数据文件无法解开——换机或重装系统请用「导出完整备份」（.kib）。'
+              : '浏览器预览版使用内存存储：刷新或关闭页面即清空全部数据，不会写入磁盘。请勿存放真实账号。'}
           </p>
           {/* PRD FR-06：设置页展示数据文件路径与"打开所在文件夹"。
               内存存储没有文件路径，也不假装有——路径显示为"未落盘"，
-              按钮禁用并说明原因；SQLCipher 落库后同一处自动显示真实路径。 */}
+              按钮禁用并说明原因；桌面版返回真实路径，同一处自动显示。 */}
           <div className="flex flex-wrap items-center gap-2" data-testid="storage-location">
             <span className="text-[11px] font-medium text-fg-muted">数据文件</span>
             <code className="rounded bg-surface px-2 py-1 text-[11px] text-fg-subtle ring-1 ring-line">

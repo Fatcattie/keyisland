@@ -7,6 +7,13 @@
 
 import { errors } from '../errors';
 import {
+  IMPORT_LIMITS,
+  assertItemCountWithinLimit,
+  assertTextWithinLimit,
+  isImportKdfWithinLimit,
+  isImportLimitError,
+} from './import-limits';
+import {
   ARGON2_PARAMS_V1,
   GCM_NONCE_LENGTH,
   base64ToBytes,
@@ -87,6 +94,16 @@ function validatePayload(value: unknown): BackupPayload {
   ) {
     throw errors.validationFailed('error.backup_invalid');
   }
+  // 覆盖导入会把备份里的密钥槽直接装进当前库，之后每次解锁都按它们的 KDF 参数派生。
+  // 超出导入上限的参数在这里就拒绝，不让一个被篡改的备份把"每次解锁"拖垮。
+  const keyslots = candidate.keyslots as Partial<KeyslotsBundle>;
+  if (
+    !isImportKdfWithinLimit(keyslots.password?.kdfParams as Argon2Params) ||
+    !isImportKdfWithinLimit(keyslots.recovery?.kdfParams as Argon2Params)
+  ) {
+    throw errors.validationFailed('error.backup_invalid');
+  }
+  assertItemCountWithinLimit(candidate.items.length);
   return candidate as BackupPayload;
 }
 
@@ -124,7 +141,10 @@ export async function importBackup(password: string, input: string): Promise<Bac
   if (password.length === 0) {
     throw errors.validationFailed('error.backup_password_required');
   }
+  // 上限检查在 JSON.parse / Base64 解码 / KDF 之前（任务 4）。
+  assertTextWithinLimit(input, IMPORT_LIMITS.backupMaxBytes);
   const envelope = parseEnvelope(input);
+  assertEnvelopeAffordable(envelope);
   let salt: Uint8Array | null = null;
   let nonce: Uint8Array | null = null;
   let key: Uint8Array | null = null;
@@ -143,10 +163,24 @@ export async function importBackup(password: string, input: string): Promise<Bac
       throw errors.validationFailed('error.backup_invalid');
     }
     return validatePayload(decoded);
-  } catch {
+  } catch (error) {
+    // 超出导入上限要如实说"太多"，其余一律归为"文件无效"，不泄露是哪一步失败。
+    if (isImportLimitError(error)) {
+      throw error;
+    }
     throw errors.validationFailed('error.backup_invalid');
   } finally {
     zeroize(salt, nonce, key);
+  }
+}
+
+/**
+ * 派生前的廉价检查：KDF 参数在导入上限内，salt / nonce 的 Base64 长度合理。
+ * 被篡改成 1 GiB 内存的文件在这里就被拒绝，不会真的去分配。
+ */
+function assertEnvelopeAffordable(envelope: { kdfParams: Argon2Params; salt: string; nonce: string }): void {
+  if (!isImportKdfWithinLimit(envelope.kdfParams) || envelope.salt.length > 64 || envelope.nonce.length > 64) {
+    throw errors.validationFailed('error.backup_invalid');
   }
 }
 

@@ -10,6 +10,7 @@
  */
 
 import { errors } from '../errors';
+import { IMPORT_LIMITS } from './import-limits';
 import { base64ToBytes, bytesToBase64, sha256 } from '../crypto';
 import { randomBytes } from '../crypto/random';
 
@@ -191,6 +192,10 @@ export function serializeKirkFile(file: KirkFile): string {
 
 /** 解析 `.kirk` 文本，校验 magic / version / 密钥长度。 */
 export function parseKirkFile(text: string): KirkFile {
+  // .kirk 只有几百字节；超大的输入不可能是合法恢复文件，解析前直接拒绝。
+  if (typeof text !== 'string' || text.length > IMPORT_LIMITS.kirkMaxBytes) {
+    throw errors.recoveryCodeInvalid();
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text) as unknown;

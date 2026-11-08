@@ -3,14 +3,15 @@
   "private": true,
   "version": "0.1.20",
   "type": "module",
-  "description": "密岛 KeyIsland —— Windows 单机私人账密管理工具（Phase 0/1 工程骨架与 Vault 核心）",
+  "description": "密岛 KeyIsland —— Windows 单机私人账密管理工具（React + Tauri 2，本地加密存储）",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "verify": "npm run typecheck && npm run test:run",
+    "test:security": "vitest run --config vitest.security.config.ts",
+    "verify": "npm run typecheck && npm run test:run && npm run test:security",
     "e2e:smoke": "node scripts/e2e/smoke.mjs",
     "e2e:startup-failure": "node scripts/e2e/smoke.mjs --startup-failure",
     "e2e:shell": "node scripts/e2e/shell.mjs",
@@ -27,7 +28,8 @@
     "e2e:contrast": "node scripts/e2e/contrast-audit.mjs",
     "e2e:visual": "node scripts/e2e/settings-shots.mjs && node scripts/e2e/contrast-audit.mjs",
     "e2e:perf": "node scripts/e2e/perf-1000.mjs",
-    "e2e:migration": "node scripts/e2e/migration.mjs"
+    "e2e:migration": "node scripts/e2e/migration.mjs",
+    "perf:items": "vitest run --config vitest.perf.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

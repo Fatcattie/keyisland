@@ -7,7 +7,14 @@
  * - **读不到剪贴板时不适用上一条**：无法验证归属就强制清空。界面承诺了
  *   "N 秒后自动清空"，把密码留在剪贴板是不可恢复的泄露，而误清用户内容只是
  *   重复制一次。结果记为 `cleared-unverified`，不伪装成"已验证后清理"。
+ * - **清理失败必须可观测**（任务 2）：端口的 `clear()` 抛错时不记"已清理"、不触发
+ *   `onCleared`。到期清理失败会有界重试（每次重试都重新核对归属），用尽后记为
+ *   `clear-failed` 并触发 `onClearFailed`，由 UI 提示用户手动清除。
+ * - **新的复制取代旧任务**：同一时刻只有一个任务"拥有"剪贴板。否则 A 的到期清理
+ *   在读不到剪贴板时会强制清空，把刚复制的 B 提前抹掉。
  * - 时间与定时器可注入，便于测试；核心逻辑不直接依赖真实时钟。
+ * - 能力边界：清空的是系统剪贴板的**当前内容**。Windows「剪贴板历史」（Win+V）
+ *   与第三方剪贴板工具可能已留存副本，这一层无法清除。
  */
 
 import { AppError, errors, toAppError } from '../core/errors';
@@ -56,10 +63,12 @@ export class BrowserClipboardPort implements ClipboardPort {
   }
 
   async clear(): Promise<void> {
+    // 刻意**不吞异常**：原先这里 catch 掉，上层就把"没清掉"记成"已清理"。
+    // 桌面 WebView 失焦、权限被拒时 writeText 都可能失败，那正是需要提示用户的时候。
     try {
       await navigator.clipboard.writeText('');
     } catch {
-      // 清理是尽力而为，失败不向用户暴露内部细节。
+      throw errors.clipboardWriteFailed();
     }
   }
 }
@@ -71,12 +80,29 @@ export function createBrowserClipboardPort(): ClipboardPort {
 
 /** 清理结果。 */
 export type ClipboardClearOutcome =
+  /** 核对归属后清空成功。 */
   | 'cleared'
-  /** 读不到剪贴板，无法验证归属，按安全优先强制清空。 */
+  /** 读不到剪贴板，无法验证归属，按安全优先强制清空（且清空成功）。 */
   | 'cleared-unverified'
+  /** 剪贴板已被用户换成别的内容，不动它。 */
   | 'overwritten'
+  /** 剪贴板已经是空的。 */
   | 'missing'
-  | 'cancelled';
+  /** 任务被取消（锁定 / 退出时若需要清理且清理成功，同样记为取消）。 */
+  | 'cancelled'
+  /** 被之后的一次复制取代：剪贴板归新任务管。 */
+  | 'superseded'
+  /** 清理失败（重试用尽，或锁定 / 退出时清理失败）：剪贴板里**可能还留着**内容。 */
+  | 'clear-failed';
+
+/** 到期清理失败后的重试间隔（ms）。次数有上限，用尽即记 `clear-failed`。 */
+export const CLIPBOARD_CLEAR_RETRY_DELAYS_MS: readonly number[] = Object.freeze([1_000, 3_000, 10_000]);
+
+/** 锁定 / 退出时的清理结果汇总。 */
+export interface ClipboardCancelResult {
+  /** 需要清理但没清掉的任务数；> 0 时调用方应提示用户手动清除。 */
+  clearFailed: number;
+}
 
 /** 已结算的清理记录（不含明文，可安全用于 UI 事件）。 */
 export interface ClipboardOutcome {
@@ -92,7 +118,12 @@ interface PendingEntry {
   digest: string;
   timer: unknown;
   settled: boolean;
+  /** 已失败的到期清理次数（用于有界重试）。 */
+  failedAttempts: number;
 }
+
+/** 清理尝试的结果。 */
+type ClearAttempt = 'cleared' | 'cleared-unverified' | 'overwritten' | 'missing' | 'failed';
 
 /** 服务依赖。 */
 export interface ClipboardServiceOptions {
@@ -109,6 +140,13 @@ export interface ClipboardServiceOptions {
   onCleared?: (receipt: CopyReceipt) => void;
   /** 剪贴板被用户覆盖回调。 */
   onOverwritten?: (receipt: CopyReceipt) => void;
+  /**
+   * 清理失败回调（重试用尽，或锁定 / 退出时清理失败）。
+   * 只带回执，不带明文；UI 据此提示"剪贴板未能自动清空，请手动清除"。
+   */
+  onClearFailed?: (receipt: CopyReceipt) => void;
+  /** 重试间隔，默认 {@link CLIPBOARD_CLEAR_RETRY_DELAYS_MS}；长度即重试上限。 */
+  retryDelaysMs?: readonly number[];
 }
 
 /** 剪贴板服务。 */
@@ -126,6 +164,10 @@ export class ClipboardService {
   private readonly onCleared: ((receipt: CopyReceipt) => void) | undefined;
 
   private readonly onOverwritten: ((receipt: CopyReceipt) => void) | undefined;
+
+  private readonly onClearFailed: ((receipt: CopyReceipt) => void) | undefined;
+
+  private readonly retryDelaysMs: readonly number[];
 
   private readonly pending = new Map<string, PendingEntry>();
 
@@ -146,6 +188,8 @@ export class ClipboardService {
     this.defaultTtlMs = options.defaultTtlMs ?? DEFAULT_CLIPBOARD_TTL_MS;
     this.onCleared = options.onCleared;
     this.onOverwritten = options.onOverwritten;
+    this.onClearFailed = options.onClearFailed;
+    this.retryDelaysMs = options.retryDelaysMs ?? CLIPBOARD_CLEAR_RETRY_DELAYS_MS;
   }
 
   /**
@@ -190,7 +234,19 @@ export class ClipboardService {
     //
     // 关闭档仍然登记：锁定时 `cancelAll({ clearIfOwned: true })` 要能按归属清掉它——
     // "不自动清"不等于"锁定了还留着"。
-    const entry: PendingEntry = { receipt, digest, timer: null, settled: false };
+    // 新内容已经写进剪贴板，之前的任务不再拥有它：取消它们的定时器与重试，
+    // 记为 `superseded`。否则旧任务到期时若读不到剪贴板，会强制清空——清掉的
+    // 恰恰是这次刚复制的内容。
+    for (const previous of this.pending.values()) {
+      if (!previous.settled) {
+        previous.settled = true;
+        this.cancel(previous.timer);
+        this.recordOutcome(previous.receipt.token, 'superseded');
+      }
+    }
+    this.pending.clear();
+
+    const entry: PendingEntry = { receipt, digest, timer: null, settled: false, failedAttempts: 0 };
     this.pending.set(token, entry);
     if (autoClear) {
       entry.timer = this.schedule(() => {
@@ -228,20 +284,28 @@ export class ClipboardService {
    * @param options.clearIfOwned 为 true 时，若剪贴板内容仍属于密岛则立即清空。
    *        锁定流程应传 true（SDD §7.4），避免密码长期停留在剪贴板。
    */
-  async cancelAll(options: { clearIfOwned?: boolean } = {}): Promise<void> {
+  async cancelAll(options: { clearIfOwned?: boolean } = {}): Promise<ClipboardCancelResult> {
     const entries = [...this.pending.values()];
     this.pending.clear();
+    let clearFailed = 0;
     for (const entry of entries) {
       if (entry.settled) {
         continue;
       }
       entry.settled = true;
+      // 同时取消到期定时器与可能在排队的重试定时器（两者共用 `timer`）。
       this.cancel(entry.timer);
-      if (options.clearIfOwned === true) {
-        await this.clearIfOwned(entry);
+      if (options.clearIfOwned === true && (await this.attemptClear(entry)) === 'failed') {
+        // 锁定 / 退出时不再重试：会话已经结束，没有人能接住后续结果。
+        // 如实记账并通知，让 UI 提示用户手动清除。
+        clearFailed += 1;
+        this.recordOutcome(entry.receipt.token, 'clear-failed');
+        this.notify(this.onClearFailed, entry.receipt);
+        continue;
       }
       this.recordOutcome(entry.receipt.token, 'cancelled');
     }
+    return { clearFailed };
   }
 
   /** 当前待清理任务数。 */
@@ -259,79 +323,97 @@ export class ClipboardService {
     this.outcomes.length = 0;
   }
 
-  /** 到期处理：仅清理仍属于本次写入的内容。 */
+  /**
+   * 到期处理：仅清理仍属于本次写入的内容；清理失败时有界重试。
+   *
+   * 任务在重试期间**仍留在 `pending` 里**：锁定 / 退出能取消它并按归属立即处理；
+   * 期间再复制一次会把它标为 `superseded`，重试定时器随之取消——不会拿旧任务
+   * 去清新内容。
+   */
   private async handleExpiry(token: string): Promise<void> {
     const entry = this.pending.get(token);
     if (!entry || entry.settled) {
       return;
     }
-    entry.settled = true;
-    this.pending.delete(token);
-
-    let current: string | null;
-    try {
-      current = await this.port.read();
-    } catch {
-      // 读不到剪贴板（权限被拒 / 环境不支持）。
-      //
-      // 无法验证归属时只能二选一：留着明文，或者清掉用户可能新复制的内容。
-      // 这两件事的代价不对称——留下的密码是不可恢复的泄露，误清的内容用户
-      // 重复制一次就好。所以清。但结果记成 `cleared-unverified`，不假装
-      // "已验证归属后清理"，免得事后排查时被误导成"剪贴板里早就没有了"。
-      await this.tryClear();
-      this.recordOutcome(token, 'cleared-unverified');
-      this.onCleared?.(entry.receipt);
+    const attempt = await this.attemptClear(entry);
+    // 等待期间可能已被锁定或新复制结算掉：那边已记账，这里不能再记一次。
+    if (entry.settled) {
       return;
     }
-
-    if (current === null) {
-      this.recordOutcome(token, 'missing');
+    if (attempt === 'failed') {
+      entry.failedAttempts += 1;
+      const delay = this.retryDelaysMs[entry.failedAttempts - 1];
+      if (delay !== undefined) {
+        entry.timer = this.schedule(() => {
+          this.track(this.handleExpiry(token));
+        }, delay);
+        return;
+      }
+      this.settle(entry, 'clear-failed');
+      this.notify(this.onClearFailed, entry.receipt);
       return;
     }
-
-    const currentDigest = await sha256Hex(current);
-    if (currentDigest === entry.digest) {
-      await this.tryClear();
-      this.recordOutcome(token, 'cleared');
-      this.onCleared?.(entry.receipt);
-      return;
-    }
-    this.recordOutcome(token, 'overwritten');
-    this.onOverwritten?.(entry.receipt);
-  }
-
-  /** 若内容仍属于本次写入则清空。 */
-  private async clearIfOwned(entry: PendingEntry): Promise<void> {
-    let current: string | null;
-    try {
-      current = await this.port.read();
-    } catch {
-      // 锁定时读不到剪贴板：同样强制清空。锁定场景更该清——用户刚按下"上锁"，
-      // 预期就是"外面不要再留着我的密码"，此时宁可多清一次。
-      await this.tryClear();
-      return;
-    }
-    if (current === null) {
-      return;
-    }
-    const currentDigest = await sha256Hex(current);
-    if (currentDigest === entry.digest) {
-      await this.tryClear();
+    this.settle(entry, attempt);
+    if (attempt === 'cleared' || attempt === 'cleared-unverified') {
+      this.notify(this.onCleared, entry.receipt);
+    } else if (attempt === 'overwritten') {
+      this.notify(this.onOverwritten, entry.receipt);
     }
   }
 
   /**
-   * 尽力清空。
+   * 核对归属并尝试清空一次。
    *
-   * 端口实现可能抛错（无权限 / 环境不支持），而清理发生在定时器回调里——
-   * 那里抛出的异常没人接，会变成未处理的 Promise rejection。清理失败不该
-   * 连带把整个到期任务搞崩。
+   * - 读不到剪贴板（权限被拒 / 环境不支持）：无法验证归属时只能二选一——留着明文，
+   *   或者清掉用户可能新复制的内容。代价不对称：留下的密码是不可恢复的泄露，误清的
+   *   内容重复制一次就好。所以清，但结果记为 `cleared-unverified`，不假装"已验证"；
+   * - 读到别的内容：用户已覆盖，不动；
+   * - 端口 `clear()` 抛错：返回 `failed`，**绝不**报成已清理。
    */
-  private async tryClear(): Promise<void> {
+  private async attemptClear(entry: PendingEntry): Promise<ClearAttempt> {
+    let current: string | null;
+    let verified = true;
+    try {
+      current = await this.port.read();
+    } catch {
+      current = null;
+      verified = false;
+    }
+    if (verified) {
+      if (current === null) {
+        return 'missing';
+      }
+      let currentDigest: string;
+      try {
+        currentDigest = await sha256Hex(current);
+      } catch {
+        return 'failed';
+      }
+      if (currentDigest !== entry.digest) {
+        return 'overwritten';
+      }
+    }
     try {
       await this.port.clear();
     } catch {
-      // 尽力而为，失败不向用户暴露内部细节。
+      return 'failed';
+    }
+    return verified ? 'cleared' : 'cleared-unverified';
+  }
+
+  /** 结算任务：移出 `pending` 并记账。 */
+  private settle(entry: PendingEntry, outcome: ClipboardClearOutcome): void {
+    entry.settled = true;
+    this.pending.delete(entry.receipt.token);
+    this.recordOutcome(entry.receipt.token, outcome);
+  }
+
+  /** 回调由 UI 提供；它抛错不能炸穿定时器回调，也不能影响已完成的记账。 */
+  private notify(callback: ((receipt: CopyReceipt) => void) | undefined, receipt: CopyReceipt): void {
+    try {
+      callback?.(receipt);
+    } catch {
+      // 忽略：通知失败不改变清理结果。
     }
   }
 
@@ -345,10 +427,13 @@ export class ClipboardService {
 
   /** 跟踪进行中的异步清理任务。 */
   private track(task: Promise<void>): void {
-    this.inflight.add(task);
-    void task.finally(() => {
-      this.inflight.delete(task);
-    });
+    // 兜底接住异常：定时器回调里的 rejection 没人 await，漏掉就是未处理的 rejection。
+    const settled: Promise<void> = task
+      .catch(() => undefined)
+      .finally(() => {
+        this.inflight.delete(settled);
+      });
+    this.inflight.add(settled);
   }
 }
 

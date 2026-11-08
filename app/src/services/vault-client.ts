@@ -10,6 +10,7 @@
  */
 
 import { AppError, errors, toAppError, type ErrorCode } from '../core/errors';
+import { assertItemCountWithinLimit } from '../core/vault/import-limits';
 import { zeroize } from '../core/crypto/random';
 import { sha256Hex } from '../core/crypto/digest';
 import type { Argon2Params } from '../core/crypto/kdf';
@@ -465,6 +466,13 @@ export interface VaultClient {
    */
   readClipboardText(): Promise<string | null>;
   /**
+   * 订阅剪贴板清理通知（任务 2）。
+   *
+   * 目前只推送"清理失败"：到期清理重试用尽，或锁定 / 退出时没能清掉。通知里只有
+   * 字段名，不含任何明文；UI 据此提示用户手动清除。返回取消订阅函数。
+   */
+  onClipboardNotice(listener: (notice: ClipboardNotice) => void): () => void;
+  /**
    * 数据文件位置描述（PRD FR-06：设置页展示数据文件路径与"打开所在文件夹"）。
    *
    * 不要求解锁：这只是"数据存在哪"的描述，不含任何数据本身。内存存储返回
@@ -592,6 +600,13 @@ async function guard<T>(operation: () => Promise<T>, fallback: ErrorCode = 'INTE
   }
 }
 
+/** 剪贴板清理通知（不含明文）。 */
+export interface ClipboardNotice {
+  kind: 'clear-failed';
+  /** 复制的是哪个字段；生成的密码等场景同样记为 password。 */
+  field: CopyReceipt['field'];
+}
+
 /** 创建 Vault 门面。 */
 export function createVaultClient(options: VaultClientOptions): VaultClient {
   const storage = options.storage;
@@ -599,10 +614,21 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
   /** 剪贴板 TTL 可在设置面板调整，因此是可变的。 */
   let clipboardTtlMs = options.clipboardTtlMs ?? DEFAULT_CLIPBOARD_TTL_MS;
 
+  const clipboardListeners = new Set<(notice: ClipboardNotice) => void>();
   const clipboard = new ClipboardService({
     port: options.clipboard ?? createBrowserClipboardPort(),
     now: clock,
     defaultTtlMs: clipboardTtlMs,
+    // 清理失败不能静默：界面承诺过"N 秒后自动清空"，没做到就要说出来。
+    onClearFailed: (receipt) => {
+      for (const listener of [...clipboardListeners]) {
+        try {
+          listener({ kind: 'clear-failed', field: receipt.field });
+        } catch {
+          // 某个订阅方出错不影响其他订阅方。
+        }
+      }
+    },
   });
 
   let itemService: ItemService | null = null;
@@ -638,7 +664,7 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
    */
   const audit = new AuditLog({ now: clock });
   /** 锁定清理（剪贴板读取 + 清空）是异步的，用 Promise 追踪以便 await。 */
-  let lockCleanup: Promise<void> | null = null;
+  let lockCleanup: Promise<unknown> | null = null;
   /** 隐藏卡片授权到期时间；`null` 表示当前无授权。 */
   let hiddenAccessUntil: number | null = null;
 
@@ -759,7 +785,7 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
       now: clock,
       store: {
         loadItems: () => storage.loadItems(),
-        saveItems: (records) => storage.saveItems(records),
+        applyItemChanges: (changes) => storage.applyItemChanges(changes),
       },
     });
   }
@@ -883,25 +909,18 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
       meta = createDefaultMeta(clock(), policy, clipboardTtlMs, input.hint ?? null);
 
       try {
-        await storage.saveKeyslots(keyslots);
-        await storage.saveMeta(meta);
-        await storage.saveItems([]);
-        await storage.saveRecency([]);
+        // 初始化必须原子（P2-1）：密钥槽、元数据、空资产、空最近使用在**同一次**
+        // 存储提交里落盘。若分四次写，`saveKeyslots` 成功而后续失败时磁盘上会残留
+        // 一个用户从未拿到恢复码的密钥槽；用户重试会生成新 DEK 并覆盖旧槽，
+        // 第一次展示的恢复码直接失效。原子提交失败时磁盘上什么都没写，不需要补偿清理。
+        await storage.commit({ keyslots, meta, items: [], recency: [] });
       } catch {
         // 回滚内存会话，避免"内存已初始化但存储未写入"的不一致。
         session.dispose();
         itemService = null;
         meta = null;
         clearHiddenAccess();
-        // 初始化必须原子（P2-1）：`saveKeyslots` 成功而后续步骤失败时，
-        // 磁盘上会残留一个用户从未拿到恢复码的密钥槽；用户重试会生成新 DEK
-        // 并覆盖旧槽，第一次展示的恢复码直接失效。因此这里要显式清空存储，
-        // 并把加载标记复位，让后续 `status()` 回到 uninitialized 且可重试。
-        try {
-          await storage.clear();
-        } catch {
-          // 清理失败不掩盖原始错误：向上仍报 STORAGE_FAILED，由 UI 提示重试。
-        }
+        // 把加载标记复位，让后续 `status()` 重新读盘，回到 uninitialized 且可重试。
         loaded = false;
         throw errors.storageFailed();
       }
@@ -955,9 +974,15 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     hint: string | null | undefined,
   ): Promise<SessionSnapshot> {
     const keyslots = session.getKeyslots();
-    if (keyslots !== null) {
+    // 新密钥槽与新提示放进同一次原子提交：只落一半时，提示说的是新密码、
+    // 能解锁的却还是旧密码（或者反过来），用户会被自己的提示误导。
+    const nextMeta = meta !== null && hint !== undefined ? { ...meta, hint, updatedAt: clock() } : null;
+    if (keyslots !== null || nextMeta !== null) {
       try {
-        await storage.saveKeyslots(keyslots);
+        await storage.commit({
+          ...(keyslots !== null ? { keyslots } : {}),
+          ...(nextMeta !== null ? { meta: nextMeta } : {}),
+        });
       } catch {
         // 回滚到存储中的旧密钥槽，避免内存与磁盘不一致。
         try {
@@ -967,10 +992,9 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
         }
         throw errors.storageFailed();
       }
-    }
-    if (meta !== null && hint !== undefined) {
-      meta = { ...meta, hint, updatedAt: clock() };
-      await persistMeta();
+      if (nextMeta !== null) {
+        meta = nextMeta;
+      }
     }
     itemService?.dispose();
     itemService = null;
@@ -1863,6 +1887,8 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     if (inputs.length === 0) {
       return { inserted: 0, skipped: 0 };
     }
+    // 门面入口同样设上限：调用方可以绕过 UI 直接传一个超大数组。
+    assertItemCountWithinLimit(inputs.length);
     const seen = await existingContentSignatures();
     const additions = selectNewItems(seen, inputs);
     const created = await internalCreateItems(additions);
@@ -1885,6 +1911,8 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
   }
 
   async function internalImportBackup(input: ImportBackupInput): Promise<ImportBackupResult> {
+    // `decodeBackup` 内部在 JSON.parse / Base64 / KDF 之前检查大小与 KDF 参数上限（任务 4）；
+    // 被拒时这里还没碰过当前库。
     const payload = await decodeBackup(input.password, input.kirkJson);
     await ensureLoaded();
     const status = session.snapshot().status;
@@ -1917,32 +1945,26 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
         await awaitLockCleanup();
         throw errors.vaultLocked();
       }
-      // 覆盖写入：先保留导入前的密文用于回滚，任一持久化失败都不留半库。
-      const rollbackItems = await storage.loadItems();
-      const rollbackRecency = recency.toJSON();
+      // 覆盖写入：四段数据在**同一次**原子提交里替换（桌面端是同一个 SQLite 事务）。
+      //
+      // 旧实现逐段写、失败时反向补偿写回。补偿写入扛不住断电或进程被杀，也可能再次
+      // 撞上同一个磁盘故障：新密钥槽已落盘而旧资产没换，库就再也解不开了。
+      // 原子提交失败时磁盘上仍是完整旧库，内存会话也还没动，用户可以直接重试。
       try {
-        await storage.saveKeyslots(payload.keyslots);
-        await storage.saveMeta(payload.meta);
-        await storage.saveItems(payload.items);
-        await storage.saveRecency(payload.recency);
+        await storage.commit({
+          keyslots: payload.keyslots,
+          meta: payload.meta,
+          items: payload.items,
+          recency: payload.recency,
+        });
       } catch {
-        try {
-          // 回滚为导入前的库内容，保证失败后仍可用。逆序恢复：
-          // 密钥槽最后写回——它是"库还能不能被打开"的最终保证。
-          await storage.saveItems(rollbackItems);
-          await storage.saveRecency(rollbackRecency);
-          await storage.saveMeta(currentMeta);
-          await storage.saveKeyslots(keyslots);
-        } catch {
-          // 连回滚都失败：只能报 STORAGE_FAILED，让用户重试或从备份重新导入，
-          // 绝不能把半库当成成功结果返回。
-          throw errors.storageFailed();
-        }
         throw errors.storageFailed();
       }
+      // 提交成功之后才切换会话与内存状态。
       session.dispose();
       clearHiddenAccess();
       await awaitLockCleanup();
+      itemService?.dispose();
       itemService = null;
       meta = null;
       recency = new RecencyTracker({ now: clock });
@@ -1965,8 +1987,12 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     const currentItems = await storage.loadItems();
     const dek = session.requireDek();
     const merged = await mergeBackupItems(currentItems, payload.items, (record) => decryptItem(record, dek));
+    // 合并只追加：只写新插入的卡片（一次原子提交），不重写当前库已有的卡片。
+    // 整体替换会把"读库 → 合并"期间别处对已有卡片的修改静默盖掉。
+    const existingIds = new Set(currentItems.map((record) => record.id));
+    const additions = merged.items.filter((record) => !existingIds.has(record.id));
     try {
-      await storage.saveItems(merged.items);
+      await storage.applyItemChanges({ upserts: additions, deletes: [] });
     } catch {
       throw errors.storageFailed();
     }
@@ -2136,6 +2162,12 @@ export function createVaultClient(options: VaultClientOptions): VaultClient {
     clearAuditLog: () => guard(internalClearAuditLog),
     recordJump: (itemId, target) => guard(() => internalRecordJump(itemId, target)),
     readClipboardText: () => guard(internalReadClipboardText),
+    onClipboardNotice: (listener) => {
+      clipboardListeners.add(listener);
+      return () => {
+        clipboardListeners.delete(listener);
+      };
+    },
     describeStorage: () =>
       guard(async () => {
         // 与其它存储路径一致：底层异常归一化为 STORAGE_FAILED，不把原始 Error 抛给 UI。

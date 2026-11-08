@@ -1,0 +1,76 @@
+# 密岛 KeyIsland · 持续集成
+#
+# 范围：只做检查，不打包、不发布、不碰任何真实保险库或凭据。
+# - frontend：锁文件安装 → 类型检查 → 单元测试 → 安全对抗测试 → 生产构建
+# - rust：在 Windows 上编译并运行 src-tauri 的 Rust 测试（含真实 SQLite 事务测试，
+#   全部在临时目录里用合成数据进行，不访问 Windows 凭据管理器）
+#
+# 任一步失败整个工作流失败。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 最小权限：只读代码。
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  frontend:
+    name: 前端检查（类型 / 测试 / 构建）
+    # 与目标平台一致：桌面版只支持 Windows，测试也在 Windows 上跑。
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: 安装依赖（按锁文件）
+        run: npm ci --no-audit --no-fund
+      - name: 类型检查
+        run: npm run typecheck
+      - name: 单元测试
+        run: npm run test:run
+      - name: 安全对抗测试
+        run: npm run test:security
+      - name: 生产构建
+        run: npm run build
+
+  rust:
+    name: Rust 检查与测试（Windows）
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      # `tauri::generate_context!` 在编译期嵌入 ../dist，没有前端产物 Rust 侧编译不过。
+      - name: 构建前端产物
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: 命令契约与构建预检
+        run: npm run desktop:doctor
+      - name: cargo test
+        working-directory: app/src-tauri
+        run: cargo test --locked

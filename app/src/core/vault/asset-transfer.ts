@@ -7,6 +7,13 @@
 
 import { errors } from '../errors';
 import {
+  IMPORT_LIMITS,
+  assertItemCountWithinLimit,
+  assertTextWithinLimit,
+  isImportKdfWithinLimit,
+  isImportLimitError,
+} from './import-limits';
+import {
   ARGON2_PARAMS_V1,
   deriveKey,
   type Argon2Params,
@@ -122,6 +129,8 @@ function validatePayload(value: unknown): AssetTransferPayload {
   if (typeof candidate.schemaVersion !== 'number' || !Array.isArray(candidate.items)) {
     throw errors.validationFailed('error.backup_invalid');
   }
+  // 先数条目再逐条校验：两万条以上直接拒绝，不做无谓的逐条处理。
+  assertItemCountWithinLimit(candidate.items.length);
   return {
     schemaVersion: candidate.schemaVersion,
     items: candidate.items.map(validateItem),
@@ -197,7 +206,12 @@ export async function importAssetTransfer(
   if (password.length === 0) {
     throw errors.validationFailed('error.password_required');
   }
+  // 上限检查在 JSON.parse / Base64 解码 / KDF 之前（任务 4）。
+  assertTextWithinLimit(input, IMPORT_LIMITS.assetBundleMaxBytes);
   const envelope = parseEnvelope(input);
+  if (!isImportKdfWithinLimit(envelope.kdfParams) || envelope.salt.length > 64 || envelope.nonce.length > 64) {
+    throw errors.validationFailed('error.backup_invalid');
+  }
   let salt: Uint8Array | null = null;
   let nonce: Uint8Array | null = null;
   let key: Uint8Array | null = null;
@@ -215,7 +229,10 @@ export async function importAssetTransfer(
       ASSET_TRANSFER_AAD,
     );
     return validatePayload(JSON.parse(bytesToUtf8(plaintext)));
-  } catch {
+  } catch (error) {
+    if (isImportLimitError(error)) {
+      throw error;
+    }
     throw errors.validationFailed('error.backup_invalid');
   } finally {
     zeroize(salt, nonce, key);

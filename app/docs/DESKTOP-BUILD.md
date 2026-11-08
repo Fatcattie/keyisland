@@ -467,9 +467,20 @@ npm run e2e:perf -- --rows=200
 
 - **`vault.db` 单独拷走解不开**：密钥在凭据管理器里，按当前 Windows 用户绑定。
 - **主密码不落盘**，忘了只能靠恢复码；恢复码也丢了就真的没了。
-- 换机器要迁移，请用设置页的**导出加密备份**，不要直接拷 `vault.db`。
+- 换机器要迁移，请用设置页的**导出完整备份**（`.kib`），不要直接拷 `vault.db`。
+- **表布局**：`kv(k, v)` 一张表。单值键 `keyslots` / `meta` / `recency` 各一行；资产每张卡片一行 `item:<id>`。
+  每行密文的 AAD 是完整键名，把一行挪到另一个键名下会解密失败。
+- **原子写入**：多键写入（初始化、覆盖导入、重设主密码、资产批量增删）走 `storage_commit`，在同一个
+  SQLite 事务里完成；加密与校验在开事务前做完，事务里出任何错都整体回滚。`journal_mode=WAL` + `synchronous=FULL`。
+- **旧库迁移**：0.1.20 及以前把全部卡片存在一行 `items` 里。首次 `storage_load_items`（或第一次增量写）时，
+  Rust 在一个事务里把它拆成 `item:<id>` 行并删掉旧行；失败回滚、旧行保留。旧行与新行同时存在
+  （装回过旧版本又写过数据）时拒绝迁移并报错，不替用户挑一份。**迁移后不要降级**到 0.1.20 及以前。
+- 验证：`cd src-tauri && cargo test` 会在系统临时目录的隔离数据库上跑事务、断连回滚、逐阶段故障注入与旧库迁移测试，
+  不访问凭据管理器、不碰 `%APPDATA%` 下的真实库。
 
-> 为什么不是 SQLCipher：SQLCipher 在 Windows 上要拖 `openssl-src`（需要 perl + nasm），构建链脆弱。当前实现是"SQLite 存密文 + RustCrypto AES-GCM 加密每个值"，安全性等价，依赖全是纯 Rust。要切回 SQLCipher 只需改 `src-tauri/src/storage.rs` 一个文件。
+> 为什么不是 SQLCipher：SQLCipher 在 Windows 上要拖 `openssl-src`（需要 perl + nasm），构建链脆弱。当前实现是"SQLite 存密文 + RustCrypto AES-GCM 加密每个值"，依赖全是纯 Rust。
+> 两者保护面不完全相同：本方案里每一行的**值**都加密，但**键名**（如 `item:12`）与行数在文件里是可见的，
+> 可以推断出大致的卡片数量；SQLCipher 是整页加密，连这些也看不到。卡片标题、平台、标签等都在值里，同样是密文。
 
 ---
 

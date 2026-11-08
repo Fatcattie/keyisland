@@ -24,10 +24,10 @@ mod storage;
 
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Manager, State, WindowEvent};
 
-use storage::{StartupError, Store};
+use storage::{CommitBatch, StartupError, Store};
 // 逐条 import 而不是在 `generate_handler!` 里写全路径：`npm run desktop:doctor`
 // 会静态比对「前端 invoke 的名字 ⊆ generate_handler! 里的名字 ⊆ 命令声明」，
 // 而它按逗号切分后只认裸标识符。写全路径会让这条静态检查误报成"前端调了未注册的命令"。
@@ -37,9 +37,13 @@ use shell::commands::{
     shell_set_island_expanded, shell_set_session, shell_show_main,
 };
 
-/// 与前端 `VaultStorage` 端口一一对应：键名固定四个。
-/// 前端传什么键都只落在这四行里，不接受任意键——避免把数据库当通用 KV 用。
-const ALLOWED_KEYS: [&str; 4] = ["keyslots", "items", "meta", "recency"];
+/// 与前端 `VaultStorage` 端口一一对应：单值键固定三个。
+/// 前端传什么键都只落在这三行里，不接受任意键——避免把数据库当通用 KV 用。
+///
+/// 资产不在这里：0.1.20 之后每张卡片一行（`item:<id>`），只能经
+/// `storage_load_items` / `storage_commit` 读写；旧布局的 `items` 行由
+/// `Store::load_items` 原子迁移，前端再也不能直接写它（否则会和新布局并存）。
+const ALLOWED_KEYS: [&str; 3] = ["keyslots", "meta", "recency"];
 
 fn ensure_allowed(key: &str) -> Result<(), String> {
     if ALLOWED_KEYS.contains(&key) {
@@ -80,6 +84,57 @@ fn storage_load(state: State<'_, AppState>, key: String) -> Result<Option<String
 fn storage_save(state: State<'_, AppState>, key: String, value: String) -> Result<(), String> {
     ensure_allowed(&key)?;
     state.store()?.set(&key, &value)
+}
+
+#[tauri::command]
+fn storage_load_items(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    state.store()?.load_items()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KvPutDto {
+    key: String,
+    value: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ItemPutDto {
+    id: u64,
+    value: String,
+}
+
+/// 一次原子写入，对应前端 `VaultWriteBatch` + `ItemChangeSet`。
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommitBatchDto {
+    #[serde(default)]
+    puts: Vec<KvPutDto>,
+    #[serde(default)]
+    replace_items: bool,
+    #[serde(default)]
+    item_upserts: Vec<ItemPutDto>,
+    #[serde(default)]
+    item_deletes: Vec<u64>,
+}
+
+/// 多键写入走同一个 SQLite 事务（任务 1）：整库覆盖、初始化、资产批量变更。
+///
+/// 不让前端拿多个 `storage_save` 自己拼"事务"：中间断电或进程被杀时，
+/// 前端的补偿写入根本没机会执行。
+#[tauri::command]
+fn storage_commit(state: State<'_, AppState>, batch: CommitBatchDto) -> Result<(), String> {
+    for put in &batch.puts {
+        ensure_allowed(&put.key)?;
+    }
+    let commit = CommitBatch {
+        puts: batch.puts.into_iter().map(|put| (put.key, put.value)).collect(),
+        replace_items: batch.replace_items,
+        item_upserts: batch.item_upserts.into_iter().map(|item| (item.id, item.value)).collect(),
+        item_deletes: batch.item_deletes,
+    };
+    state.store()?.commit(&commit)
 }
 
 #[tauri::command]
@@ -379,6 +434,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             storage_load,
             storage_save,
+            storage_load_items,
+            storage_commit,
             storage_clear,
             storage_describe,
             storage_reveal,

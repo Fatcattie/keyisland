@@ -40,6 +40,18 @@ export function SessionGate(): JSX.Element {
   /** 会话状态的唯一写入者（`ShellBridge` 只读它、再单向推给 Rust）。 */
   const setSessionStatus = useUiStore((state) => state.setSessionStatus);
 
+  // 剪贴板自动清空失败（任务 2）：界面承诺过"N 秒后自动清空"，没做到必须告诉用户。
+  // 通知不含明文，只说"可能还留着"，让用户自己清掉。
+  useEffect(
+    () =>
+      client.onClipboardNotice((notice) => {
+        if (notice.kind === 'clear-failed') {
+          toast('剪贴板未能自动清空，复制的内容可能还在，请手动清除（如复制一段无关文字）');
+        }
+      }),
+    [client, toast],
+  );
+
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const next = await client.status();

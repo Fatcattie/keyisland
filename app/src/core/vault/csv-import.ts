@@ -9,6 +9,7 @@
  */
 
 import type { CreateItemInput, Visibility } from './types';
+import { IMPORT_LIMITS, assertItemCountWithinLimit, assertTextWithinLimit } from './import-limits';
 import { DEFAULT_CATEGORIES } from './categories';
 
 /**
@@ -112,6 +113,8 @@ function matchColumn(raw: string, aliases: readonly string[]): string | null {
 
 /** 解析一段 CSV 文本为行数组（支持引号、转义引号、CRLF、BOM）。 */
 export function parseCsvRows(text: string): string[][] {
+  // 上限检查在逐字符解析之前（任务 4）：领域入口自己把关，不依赖 UI 先查过。
+  assertTextWithinLimit(text, IMPORT_LIMITS.csvMaxBytes);
   const rows: string[][] = [];
   let field = '';
   let row: string[] = [];
@@ -249,6 +252,8 @@ export function previewCsvImport(
   if (rows.length === 0) {
     throw new Error('CSV 文件为空');
   }
+  // 第一行是表头，其余是数据行。
+  assertItemCountWithinLimit(rows.length - 1);
   const mapping = resolveCsvColumns(rows[0], override);
   if (mapping.title === null || mapping.username === null || mapping.password === null) {
     throw new Error('CSV 映射缺少名称/账号/密码列');

@@ -745,7 +745,7 @@ console.log('');
 
 if (blockers.length === 0) {
   console.log(`${c.green}${c.bold}环境就绪。${c.reset} 可以出包了：\n`);
-  console.log(`  ${c.cyan}cd src-tauri && cargo test${c.reset}   ${c.dim}# 先跑 8 条存储单测（十几秒）${c.reset}`);
+  console.log(`  ${c.cyan}cd src-tauri && cargo test${c.reset}   ${c.dim}# 先跑 Rust 单测（含 SQLite 事务 / 迁移测试）${c.reset}`);
   console.log(`  ${c.cyan}npm run desktop:build${c.reset}      ${c.dim}# 出安装包，产物在 src-tauri/target/release/bundle/${c.reset}`);
   if (warnings.length > 0) {
     console.log(`\n${c.yellow}有 ${warnings.length} 条提醒，不阻塞构建。${c.reset}`);

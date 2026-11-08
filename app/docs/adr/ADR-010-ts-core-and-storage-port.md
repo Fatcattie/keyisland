@@ -1,5 +1,10 @@
 # ADR-010：以 TypeScript 实现 Vault 核心，并保留 `VaultClient` / `VaultStorage` 端口
 
+> **后续变更（0.1.20 之后）**：桌面端最终没有采用 SQLCipher，而是"SQLite 存密文 + 每值 AES-256-GCM"，
+> 端口语义由 `src/services/__tests__/support/storage-contract.ts` 约束；端口新增了原子的 `commit` 与增量的
+> `applyItemChanges`。现状见 [`../DESKTOP-BUILD.md`](../DESKTOP-BUILD.md) §4 与 [`../../README.md`](../../README.md)「存储与数据安全」。
+> 下文保留当时的决策语境。
+
 - 状态：已接受（临时方案，Phase 1.5 需复核）
 - 日期：2026-10-20
 - 决策人：工程师（寇豆码）

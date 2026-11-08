@@ -4,7 +4,9 @@
  * 对应 Rust 侧 `src-tauri/src/storage.rs`：
  * - 数据落在 `%APPDATA%/com.keyisland.desktop/vault.db`（SQLite）；
  * - 每个值单独 AES-256-GCM 加密，AAD 绑定键名；
- * - 数据库密钥存 Windows 凭据管理器，**不落盘**，所以单拷走 `vault.db` 解不开。
+ * - 数据库密钥存 Windows 凭据管理器，**不落盘**，所以单拷走 `vault.db` 解不开；
+ * - 资产每张卡片一行（`item:<id>`），单卡修改只重写那一行；
+ * - 多键写入（`commit` / `applyItemChanges`）由 Rust 在**一个 SQLite 事务**里完成。
  *
  * 接口语义与 `MemoryVaultStorage` 完全一致（ADR-010：迁移时端口不变），
  * 唯一差别是 `describeStorage()` 返回真实路径、`canReveal` 为 true。
@@ -14,7 +16,16 @@ import { invoke } from '@tauri-apps/api/core';
 import { errors } from '../core/errors';
 import type { EncryptedItemRecord, RecentEntry } from '../core/vault/types';
 import { isKeyslotsBundle, type KeyslotsBundle } from '../core/vault/keyslots';
-import type { StorageLocation, VaultMeta, VaultStorage } from './storage';
+import {
+  assertValidBatch,
+  assertValidChangeSet,
+  isValidItemId,
+  type ItemChangeSet,
+  type StorageLocation,
+  type VaultMeta,
+  type VaultStorage,
+  type VaultWriteBatch,
+} from './storage';
 
 /** 当前是否跑在 Tauri 壳里（浏览器里为 false，走内存存储）。 */
 export function isDesktopShell(): boolean {
@@ -118,6 +129,27 @@ async function writeJson(key: string, value: unknown): Promise<void> {
   }
 }
 
+/** 与 Rust `CommitBatchDto` 一一对应（serde camelCase）。 */
+interface CommitBatchPayload {
+  puts: Array<{ key: string; value: string }>;
+  replaceItems: boolean;
+  itemUpserts: Array<{ id: number; value: string }>;
+  itemDeletes: number[];
+}
+
+function toItemPut(record: EncryptedItemRecord): { id: number; value: string } {
+  return { id: record.id, value: JSON.stringify(record) };
+}
+
+/** 一次 IPC、一个 SQLite 事务：要么全部落盘，要么一条都不落。 */
+async function invokeCommit(batch: CommitBatchPayload): Promise<void> {
+  try {
+    await invoke('storage_commit', { batch });
+  } catch {
+    throw errors.storageFailed();
+  }
+}
+
 export class TauriVaultStorage implements VaultStorage {
   async loadKeyslots(): Promise<KeyslotsBundle | null> {
     return readJson<KeyslotsBundle>('keyslots', isKeyslotsBundle);
@@ -132,14 +164,67 @@ export class TauriVaultStorage implements VaultStorage {
   }
 
   async loadItems(): Promise<EncryptedItemRecord[]> {
-    return (await readJson<EncryptedItemRecord[]>('items', Array.isArray)) ?? [];
+    // 每张卡片一行；旧版"一行存全部"的布局由 Rust 在同一事务里迁移后再返回。
+    let rows: unknown;
+    try {
+      rows = await invoke<string[]>('storage_load_items');
+    } catch {
+      throw errors.storageFailed();
+    }
+    if (!Array.isArray(rows)) {
+      throw errors.storageFailed();
+    }
+    const records: EncryptedItemRecord[] = [];
+    for (const row of rows) {
+      let parsed: unknown;
+      try {
+        parsed = typeof row === 'string' ? JSON.parse(row) : null;
+      } catch {
+        throw errors.storageFailed();
+      }
+      if (parsed === null || typeof parsed !== 'object' || !isValidItemId((parsed as EncryptedItemRecord).id)) {
+        throw errors.storageFailed();
+      }
+      records.push(parsed as EncryptedItemRecord);
+    }
+    return records;
   }
 
   async saveItems(records: EncryptedItemRecord[]): Promise<void> {
-    if (!Array.isArray(records)) {
-      throw errors.storageFailed();
+    await this.commit({ items: records });
+  }
+
+  async applyItemChanges(changes: ItemChangeSet): Promise<void> {
+    assertValidChangeSet(changes);
+    if (changes.upserts.length === 0 && changes.deletes.length === 0) {
+      return;
     }
-    await writeJson('items', records);
+    await invokeCommit({
+      puts: [],
+      replaceItems: false,
+      itemUpserts: changes.upserts.map(toItemPut),
+      itemDeletes: [...changes.deletes],
+    });
+  }
+
+  async commit(batch: VaultWriteBatch): Promise<void> {
+    assertValidBatch(batch);
+    const puts: Array<{ key: string; value: string }> = [];
+    if (batch.keyslots !== undefined) {
+      puts.push({ key: 'keyslots', value: JSON.stringify(batch.keyslots) });
+    }
+    if (batch.meta !== undefined) {
+      puts.push({ key: 'meta', value: JSON.stringify(batch.meta) });
+    }
+    if (batch.recency !== undefined) {
+      puts.push({ key: 'recency', value: JSON.stringify(batch.recency) });
+    }
+    await invokeCommit({
+      puts,
+      replaceItems: batch.items !== undefined,
+      itemUpserts: (batch.items ?? []).map(toItemPut),
+      itemDeletes: [],
+    });
   }
 
   async loadMeta(): Promise<VaultMeta | null> {

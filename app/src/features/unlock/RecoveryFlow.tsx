@@ -10,6 +10,8 @@
  */
 
 import { useState, type FormEvent } from 'react';
+import { IMPORT_LIMITS, isImportLimitError } from '../../core/vault/import-limits';
+import { readTextFile } from '../../lib/read-text-file';
 import { ShieldAlert } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Field, INPUT_CLASS, TEXTAREA_CLASS } from '../../components/ui/Field';
@@ -34,25 +36,11 @@ function looksLikeKirk(text: string): boolean {
 }
 
 /**
- * 读取用户选择的 `.kirk` 文件。
- *
- * 优先用 `Blob.text()`；某些 WebView（以及 jsdom）没有实现它，
- * 退回 `FileReader`。两条路径都只返回文本，不做任何解析之外的处理。
+ * 读取用户选择的 `.kirk` 文件（读之前按大小拒绝，见 `IMPORT_LIMITS.kirkMaxBytes`）。
+ * 只返回文本，不做任何解析之外的处理。
  */
 async function readKirkFile(file: File): Promise<string> {
-  if (typeof file.text === 'function') {
-    return file.text();
-  }
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (): void => {
-      resolve(typeof reader.result === 'string' ? reader.result : '');
-    };
-    reader.onerror = (): void => {
-      reject(new Error('无法读取该文件'));
-    };
-    reader.readAsText(file);
-  });
+  return readTextFile(file, IMPORT_LIMITS.kirkMaxBytes);
 }
 
 /** 恢复流程。 */
@@ -81,8 +69,13 @@ export function RecoveryFlow({ onCancel, onDone }: RecoveryFlowProps): JSX.Eleme
       setCredential(text);
       setFileName(file.name);
       setError(null);
-    } catch {
-      setError('无法读取该文件，请确认它仍然存在且有读取权限');
+    } catch (caught) {
+      // 超大文件不可能是 .kirk（真实文件只有几百字节）：直接说"选错了"，比"读不了"更能指路。
+      setError(
+        isImportLimitError(caught)
+          ? '这个文件太大，不是 .kirk 恢复文件，请重新选择'
+          : '无法读取该文件，请确认它仍然存在且有读取权限',
+      );
     }
   };
 

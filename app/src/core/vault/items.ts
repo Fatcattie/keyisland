@@ -3,7 +3,9 @@
  *
  * 安全边界：
  * - 明文只存在于解锁态内存（`ItemService` 实例生命周期内）。
- * - 每次写操作都会把整表重新加密后交给 `ItemStorePort`，绝不落明文。
+ * - 每次写操作只把**变化的卡片**重新加密后交给 `ItemStorePort`，绝不落明文；
+ *   无关卡片不被重新加密、不被重写（任务 5）。
+ * - 写操作串行执行；落盘失败时内存回滚到写之前，锁定后不再写盘。
  * - `hidden` 资产不进入普通列表；访问详情需显式 `allowHidden` 授权。
  */
 
@@ -39,10 +41,15 @@ export const ITEM_LIMITS = Object.freeze({
   tags: 20,
 });
 
-/** 持久化端口：只接受密文记录。 */
+/**
+ * 持久化端口：只接受密文记录。
+ *
+ * 写入是**增量且原子**的：只交出这次变化的卡片（与 `VaultStorage.applyItemChanges`
+ * 同一语义），实现方必须保证同一次调用要么全部落盘、要么一条都不落。
+ */
 export interface ItemStorePort {
   loadItems(): Promise<EncryptedItemRecord[]>;
-  saveItems(records: EncryptedItemRecord[]): Promise<void>;
+  applyItemChanges(changes: { upserts: EncryptedItemRecord[]; deletes: number[] }): Promise<void>;
 }
 
 /** 资产服务依赖。 */
@@ -197,6 +204,17 @@ export class ItemService {
 
   private readonly store: ItemStorePort;
 
+  /**
+   * 写操作队列：上一笔写完（成功或失败）才开始下一笔。
+   *
+   * 不串行的话，同一张卡片的两次修改各自 `await` 加密，后发起的可能先落盘、
+   * 先发起的再把它盖掉——内存里是新值、磁盘上是旧值，重启后静默丢一次修改。
+   */
+  private writeQueue: Promise<void> = Promise.resolve();
+
+  /** 每次 `dispose()` 加一；在途写入据此判断"锁定发生过"，不再落盘也不再回填明文。 */
+  private generation = 0;
+
   constructor(options: ItemServiceOptions) {
     this.dek = options.dek;
     this.now = options.now;
@@ -232,10 +250,14 @@ export class ItemService {
 
   /** 批量创建资产：所有输入先校验，最后只写盘一次，避免导入半途留下半批数据。 */
   async createItems(inputs: readonly CreateItemInput[]): Promise<ItemSummary[]> {
-    await this.hydrate();
     if (inputs.length === 0) {
+      await this.hydrate();
       return [];
     }
+    return this.mutate(() => this.createItemsNow(inputs));
+  }
+
+  private async createItemsNow(inputs: readonly CreateItemInput[]): Promise<ItemSummary[]> {
     const now = this.now();
     const originalNextId = this.nextId;
     const created: ItemPlain[] = [];
@@ -265,20 +287,30 @@ export class ItemService {
         this.nextId = id + 1;
         created.push(item);
       }
-      await this.flush();
-      return created.map(toItemSummary);
     } catch (error) {
+      // 校验失败：整批作废，一条都不写。
       for (const item of created) {
         this.items.delete(item.id);
       }
       this.nextId = originalNextId;
       throw error;
     }
+    const previous = new Map<number, ItemPlain | undefined>(created.map((item) => [item.id, undefined]));
+    try {
+      await this.persist(created, [], previous);
+    } catch (error) {
+      this.nextId = originalNextId;
+      throw error;
+    }
+    return created.map(toItemSummary);
   }
 
   /** 更新资产；未传 `visibility` 时保持原值（降级保护）。 */
   async updateItem(id: number, input: UpdateItemInput): Promise<ItemSummary> {
-    await this.hydrate();
+    return this.mutate(() => this.updateItemNow(id, input));
+  }
+
+  private async updateItemNow(id: number, input: UpdateItemInput): Promise<ItemSummary> {
     const existing = this.requireItem(id);
     const now = this.now();
 
@@ -326,46 +358,47 @@ export class ItemService {
     }
 
     next.updatedAt = now;
-    this.items.set(id, next);
-    await this.flush();
-    return toItemSummary(next);
+    return this.replaceItem(existing, next);
   }
 
   /** 删除资产。 */
   async deleteItem(id: number): Promise<void> {
-    await this.hydrate();
-    if (!this.items.has(id)) {
-      throw errors.itemNotFound();
-    }
-    this.items.delete(id);
-    await this.flush();
+    await this.mutate(async () => {
+      const existing = this.requireItem(id);
+      this.items.delete(id);
+      await this.persist([], [id], new Map([[id, existing]]));
+    });
   }
 
   /**
-   * 批量删除：一次 flush，要么全删要么全不删。
+   * 批量删除：一次原子写入，要么全删要么全不删。
    *
    * 与 `deleteItem` 的差别：不存在的 id 静默跳过，不抛 `ITEM_NOT_FOUND`。
    * 批量场景里只要有一条失效就整体失败，用户会陷入"删不掉也说不清为什么"的困境。
    *
-   * 原子性来自 `flush()`：它是**一次整体写盘**，不是逐条写。所以这里刻意
-   * 不用 `for (id) await this.deleteItem(id)` 的循环——那样每条都写一次盘，
-   * 中途抛错（或进程被杀）会留下"删了一半"的状态，而且 N 条要付 N 次 I/O。
+   * 原子性来自 `applyItemChanges`：所有删除放进**同一次**存储调用（桌面端是同一个
+   * SQLite 事务）。所以这里刻意不用 `for (id) await this.deleteItem(id)` 的循环——
+   * 那样中途抛错（或进程被杀）会留下"删了一半"的状态，而且 N 条要付 N 次 I/O。
    *
    * @param ids 待删除的 id（允许重复、允许不存在）。
    * @returns 实际被删除的 id（顺序与入参一致）。
    */
   async deleteMany(ids: readonly number[]): Promise<number[]> {
-    await this.hydrate();
-    const removed: number[] = [];
-    for (const id of ids) {
-      if (this.items.delete(id)) {
-        removed.push(id);
+    return this.mutate(async () => {
+      const removed: number[] = [];
+      const previous = new Map<number, ItemPlain | undefined>();
+      for (const id of ids) {
+        const existing = this.items.get(id);
+        if (existing !== undefined && this.items.delete(id)) {
+          removed.push(id);
+          previous.set(id, existing);
+        }
       }
-    }
-    if (removed.length > 0) {
-      await this.flush();
-    }
-    return removed;
+      if (removed.length > 0) {
+        await this.persist([], removed, previous);
+      }
+      return removed;
+    });
   }
 
   /** 读取详情；隐藏卡片必须显式授权。 */
@@ -406,26 +439,22 @@ export class ItemService {
 
   /** 设置收藏。 */
   async setFavorite(id: number, favorite: boolean): Promise<ItemSummary> {
-    await this.hydrate();
-    const item = this.requireItem(id);
-    const next: ItemPlain = { ...item, favorite, updatedAt: this.now() };
-    this.items.set(id, next);
-    await this.flush();
-    return toItemSummary(next);
+    return this.mutate(() => {
+      const item = this.requireItem(id);
+      return this.replaceItem(item, { ...item, favorite, updatedAt: this.now() });
+    });
   }
 
   /** 设置可见性。 */
   async setVisibility(id: number, visibility: Visibility): Promise<ItemSummary> {
-    await this.hydrate();
-    const item = this.requireItem(id);
-    const next: ItemPlain = {
-      ...item,
-      visibility: parseVisibility(visibility),
-      updatedAt: this.now(),
-    };
-    this.items.set(id, next);
-    await this.flush();
-    return toItemSummary(next);
+    return this.mutate(() => {
+      const item = this.requireItem(id);
+      return this.replaceItem(item, {
+        ...item,
+        visibility: parseVisibility(visibility),
+        updatedAt: this.now(),
+      });
+    });
   }
 
   /**
@@ -475,6 +504,7 @@ export class ItemService {
 
   /** 清空内存明文缓存（锁定时调用）。 */
   dispose(): void {
+    this.generation += 1;
     this.items.clear();
     this.hydrated = false;
   }
@@ -488,15 +518,86 @@ export class ItemService {
     return item;
   }
 
-  /** 把当前内存资产整体加密后写回存储。 */
-  private async flush(): Promise<void> {
-    const records: EncryptedItemRecord[] = [];
-    for (const item of this.items.values()) {
-      records.push(await encryptItem(item, this.dek));
+  /**
+   * 串行执行一次写操作。
+   *
+   * **调用一开始**就记下 `generation`（在 `hydrate` 的 await 之前）：从发起到真正执行
+   * 之间发生过锁定（`dispose`），这笔写操作就不再执行，报 `VAULT_LOCKED`——否则它会
+   * 在已清空的内存上运行，报出误导人的 `ITEM_NOT_FOUND`，甚至用已清零的 DEK 重新
+   * hydrate。
+   */
+  private async mutate<T>(task: () => Promise<T>): Promise<T> {
+    const generation = this.generation;
+    await this.hydrate();
+    if (generation !== this.generation) {
+      throw errors.vaultLocked();
+    }
+    const run = this.writeQueue.then(() => {
+      if (generation !== this.generation) {
+        throw errors.vaultLocked();
+      }
+      return task();
+    });
+    this.writeQueue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  /** 用 `next` 替换 `existing` 并只写这一张卡片。 */
+  private async replaceItem(existing: ItemPlain, next: ItemPlain): Promise<ItemSummary> {
+    this.items.set(next.id, next);
+    await this.persist([next], [], new Map([[existing.id, existing]]));
+    return toItemSummary(next);
+  }
+
+  /**
+   * 只把这次变化的卡片加密并写盘（增量），失败时把内存恢复成 `previous`。
+   *
+   * - `changed` 是调用方**同步**拿到的明文快照：哪怕加密途中发生锁定、`items` 被清空，
+   *   也不会去读一张已经不存在的卡片；
+   * - 加密完成后若发现期间发生过锁定，**不写盘**：锁定会清零 DEK，在途的加密可能
+   *   已经用了被清零的密钥，写下去就是一张永远解不开的卡；
+   * - 回滚只在没发生过锁定时进行，否则会把明文重新塞回一个已销毁的服务里。
+   *
+   * @param previous 每个受影响 id 写之前的值；`undefined` 表示写之前不存在。
+   */
+  private async persist(
+    changed: readonly ItemPlain[],
+    deletes: readonly number[],
+    previous: ReadonlyMap<number, ItemPlain | undefined>,
+  ): Promise<void> {
+    const generation = this.generation;
+    const rollback = (): void => {
+      if (generation !== this.generation) {
+        return;
+      }
+      for (const [id, value] of previous) {
+        if (value === undefined) {
+          this.items.delete(id);
+        } else {
+          this.items.set(id, value);
+        }
+      }
+    };
+
+    const upserts: EncryptedItemRecord[] = [];
+    try {
+      for (const item of changed) {
+        upserts.push(await encryptItem(item, this.dek));
+      }
+    } catch (error) {
+      rollback();
+      throw error;
+    }
+    if (generation !== this.generation) {
+      throw errors.vaultLocked();
     }
     try {
-      await this.store.saveItems(records);
+      await this.store.applyItemChanges({ upserts, deletes: [...deletes] });
     } catch {
+      rollback();
       throw errors.storageFailed();
     }
   }

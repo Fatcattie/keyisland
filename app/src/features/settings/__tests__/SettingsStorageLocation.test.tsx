@@ -4,7 +4,7 @@
  * 契约：
  * 1. 内存存储阶段如实显示"内存存储（未落盘）"——不显示假路径；
  * 2. "打开所在文件夹"按钮禁用，且标题说明原因（没有文件夹可打开）；
- * 3. 若存储报告了真实路径与可打开状态（SQLCipher 落库后的未来形态），
+ * 3. 若存储报告了真实路径与可打开状态（桌面版 SQLite 落库的形态），
  *    同一处 UI 无需改动即显示路径并启用按钮——用 mock 证明这个适配性。
  */
 
@@ -43,7 +43,7 @@ describe('设置面板 · 数据文件位置', () => {
     expect(button.title).toContain('没有文件夹可打开');
   });
 
-  it('存储报告真实路径时：显示路径并启用按钮（SQLCipher 落地后的形态）', async () => {
+  it('存储报告真实路径时：显示路径并启用按钮（桌面版落库的形态）', async () => {
     const { client } = createTestClient('boot');
     await client.initialize({ masterPassword: MASTER_PASSWORD });
     // 模拟未来的文件存储：describeStorage 返回真实路径与可打开状态。

@@ -8,7 +8,14 @@
 import type { EncryptedItemRecord, RecentEntry } from '../../../core/vault/types';
 import type { KeyslotsBundle } from '../../../core/vault/keyslots';
 import type { ClipboardPort } from '../../clipboard';
-import { MemoryVaultStorage, type StorageLocation, type VaultMeta, type VaultStorage } from '../../storage';
+import {
+  MemoryVaultStorage,
+  type ItemChangeSet,
+  type StorageLocation,
+  type VaultMeta,
+  type VaultStorage,
+  type VaultWriteBatch,
+} from '../../storage';
 
 /** 内存剪贴板端口，记录写入/清理次数，可模拟读取被拒。 */
 export class FakeClipboardPort implements ClipboardPort {
@@ -71,6 +78,28 @@ export class FaultyStorage implements VaultStorage {
   async saveItems(records: EncryptedItemRecord[]): Promise<void> {
     this.check('saveItems');
     await this.inner.saveItems(records);
+  }
+
+  /** 增量写资产：注入 `saveItems` 或 `applyItemChanges` 故障都会让它整体失败。 */
+  async applyItemChanges(changes: ItemChangeSet): Promise<void> {
+    this.check('applyItemChanges');
+    this.check('saveItems');
+    await this.inner.applyItemChanges(changes);
+  }
+
+  /**
+   * 原子提交：批次里涉及的每一段都按对应的 `saveX` 名称检查故障。
+   *
+   * 检查全部发生在写入之前——任何一段"写失败"都等价于整批不生效，
+   * 这正是真实实现（同一个 SQLite 事务）的语义；"写了一半"在这里不可能出现。
+   */
+  async commit(batch: VaultWriteBatch): Promise<void> {
+    this.check('commit');
+    if (batch.keyslots !== undefined) this.check('saveKeyslots');
+    if (batch.meta !== undefined) this.check('saveMeta');
+    if (batch.items !== undefined) this.check('saveItems');
+    if (batch.recency !== undefined) this.check('saveRecency');
+    await this.inner.commit(batch);
   }
 
   async loadMeta(): Promise<VaultMeta | null> {

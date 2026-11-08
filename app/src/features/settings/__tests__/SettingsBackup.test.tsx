@@ -34,7 +34,7 @@ describe('设置面板 · 备份与恢复', () => {
     const { client, user } = await renderPanel();
     await client.lock('manual');
     // 锁定态下 client.exportBackup 抛 VAULT_LOCKED，UI 只展示中文文案。
-    await user.click(screen.getByRole('button', { name: '导出备份' }));
+    await user.click(screen.getByRole('button', { name: '导出完整备份' }));
     await user.type(screen.getByLabelText('备份密码'), BACKUP_PASSWORD);
     await user.click(screen.getByRole('button', { name: '导出 .kib 文件' }));
     await waitFor(() => {
@@ -59,7 +59,7 @@ describe('设置面板 · 备份与恢复', () => {
 
   it('合并导入不需要确认词，覆盖导入必须输入「覆盖」', async () => {
     const { user } = await renderPanel();
-    await user.click(screen.getByRole('button', { name: '导入备份' }));
+    await user.click(screen.getByRole('button', { name: '导入完整备份' }));
 
     // 默认合并：无确认输入框。
     expect(screen.queryByPlaceholderText('覆盖')).toBeNull();
@@ -72,7 +72,7 @@ describe('设置面板 · 备份与恢复', () => {
 
   it('选择 .kib 文件后内容进入粘贴区（jsdom 无 Blob.text 时走 FileReader）', async () => {
     const { user } = await renderPanel();
-    await user.click(screen.getByRole('button', { name: '导入备份' }));
+    await user.click(screen.getByRole('button', { name: '导入完整备份' }));
     const input = screen.getByLabelText('备份文件');
     Object.defineProperty(input, 'files', {
       value: [new File(['{"magic":"KIB1","version":1}'], 'backup.kib', { type: 'application/json' })],
@@ -87,7 +87,7 @@ describe('设置面板 · 备份与恢复', () => {
   it('覆盖导入必须同时提供确认词与当前库主密码', async () => {
     const { client, user } = await renderPanel();
     await client.createItem({ title: 'Keep', username: 'k@example.com', password: 'Keep-1-Aa1!' });
-    await user.click(screen.getByRole('button', { name: '导入备份' }));
+    await user.click(screen.getByRole('button', { name: '导入完整备份' }));
     await user.type(screen.getByLabelText('备份密码'), BACKUP_PASSWORD);
     await user.selectOptions(screen.getByLabelText('恢复方式'), 'overwrite');
     fireEvent.change(screen.getByLabelText('备份文件内容'), { target: { value: '{"magic":"KIB1","version":1}' } });
@@ -117,7 +117,7 @@ describe('设置面板 · 备份与恢复', () => {
     const exportSpy = vi
       .spyOn(client, 'importBackup')
       .mockRejectedValue(new AppError('VALIDATION_FAILED', 'error.backup_invalid', false));
-    await user.click(screen.getByRole('button', { name: '导入备份' }));
+    await user.click(screen.getByRole('button', { name: '导入完整备份' }));
     await user.type(screen.getByLabelText('备份密码'), BACKUP_PASSWORD);
     // userEvent 会把 `{` 当作键盘描述符，因此用 fireEvent.change 注入内容。
     fireEvent.change(screen.getByLabelText('备份文件内容'), {

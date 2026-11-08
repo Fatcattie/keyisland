@@ -9,7 +9,14 @@ import { describe, expect, it } from 'vitest';
 import { ARGON2_TEST_PARAMS } from '../../src/core/crypto';
 import type { KeyslotsBundle } from '../../src/core/vault/keyslots';
 import type { AutoLockPolicy, EncryptedItemRecord, RecentEntry } from '../../src/core/vault/types';
-import { MemoryVaultStorage, type StorageLocation, type VaultMeta, type VaultStorage } from '../../src/services/storage';
+import {
+  MemoryVaultStorage,
+  type ItemChangeSet,
+  type StorageLocation,
+  type VaultMeta,
+  type VaultStorage,
+  type VaultWriteBatch,
+} from '../../src/services/storage';
 import { createVaultClient } from '../../src/services/vault-client';
 
 const NOW = 1_700_000_000_000;
@@ -51,6 +58,20 @@ class FaultyStorage implements VaultStorage {
   async saveItems(records: EncryptedItemRecord[]): Promise<void> {
     this.ensure('saveItems');
     return this.inner.saveItems(records);
+  }
+
+  async applyItemChanges(changes: ItemChangeSet): Promise<void> {
+    this.ensure('saveItems');
+    return this.inner.applyItemChanges(changes);
+  }
+
+  /** 原子提交：涉及的任一段注入了故障，整批在写入前被拒绝（与 SQLite 事务语义一致）。 */
+  async commit(batch: VaultWriteBatch): Promise<void> {
+    if (batch.keyslots !== undefined) this.ensure('saveKeyslots');
+    if (batch.meta !== undefined) this.ensure('saveMeta');
+    if (batch.items !== undefined) this.ensure('saveItems');
+    if (batch.recency !== undefined) this.ensure('saveRecency');
+    return this.inner.commit(batch);
   }
 
   async loadMeta(): Promise<VaultMeta | null> {

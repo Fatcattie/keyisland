@@ -84,6 +84,24 @@ const SHELL_BRIDGE = `
           writeDb(db);
           return null;
         }
+        case 'storage_load_items':
+          return Object.entries(readDb())
+            .filter(([key]) => key.startsWith('item:'))
+            .sort(([a], [b]) => Number(a.slice(5)) - Number(b.slice(5)))
+            .map(([, value]) => value);
+        case 'storage_commit': {
+          // 与 Rust 事务同语义：先在副本上应用，最后一次写回。
+          const db = readDb();
+          const batch = args.batch;
+          if (batch.replaceItems) {
+            for (const key of Object.keys(db)) if (key.startsWith('item:')) delete db[key];
+          }
+          for (const id of batch.itemDeletes) delete db['item:' + id];
+          for (const put of batch.puts) db[put.key] = put.value;
+          for (const item of batch.itemUpserts) db['item:' + item.id] = item.value;
+          writeDb(db);
+          return null;
+        }
         case 'storage_clear':
           writeDb({});
           return null;

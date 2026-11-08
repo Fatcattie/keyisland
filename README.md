@@ -28,7 +28,9 @@ Tauri 2 · React 18 · Vite 5 · Rust · Zustand · framer-motion
 
 ## 它是什么
 
-- **加密保险库**：主密码派生密钥，数据以 SQLCipher 落盘；另有一份恢复码，主密码忘了还能救。
+- **加密保险库**：主密码经 Argon2id 派生密钥解开资产密钥；数据存本机 SQLite，每一项再以 AES-256-GCM 加密，
+  外层密钥放在 Windows 凭据管理器（绑定当前用户）。另有一份恢复码，主密码忘了还能救。
+  单独拷走数据文件打不开，换机请用 `.kib` 备份。
 - **灵动岛**：主面板关掉不是消失，而是缩成贴边的胶囊。鼠标推到屏幕上沿唤出，
   滚轮翻卡、Enter 复制密码、⇧Enter 复制账号、**中键退出选择**。
 - **白天 / 黑夜主题**：侧栏底部一键切换；没手动选过时跟随系统的深色设置。
@@ -50,6 +52,8 @@ npm install
 npm run dev            # 浏览器预览（内存存储，重启即清空，别放真实数据）
 npm run typecheck      # tsc --noEmit
 npm run test:run       # 单元测试（vitest + jsdom）
+npm run test:security  # 安全对抗测试
+npm run verify         # typecheck + 单元测试 + 安全测试（CI 同款）
 npm run e2e:smoke      # 真实 Chrome 跑生产包（需先 npm run build）
 npm run e2e:visual     # 改了 UI 就跑：截图 + 对比度审计
 ```

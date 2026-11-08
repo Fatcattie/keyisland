@@ -79,6 +79,8 @@ const MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   'error.backup_password_required': '请输入备份时使用的主密码',
   'error.backup_merge_unsupported': '该备份来自另一个保险库，不能合并导入，请改用「覆盖导入」',
   'error.export_empty': '这个分类下还没有卡片，换个导出范围再试',
+  'error.import_too_large': '文件太大，超出了单次导入的上限，当前库未做任何修改',
+  'error.import_too_many_items': '卡片数量超出单次导入上限（2 万张），当前库未做任何修改',
 
   // —— 密码策略（`policy.ts` 的 reasons） ——
   'password.too_short': '至少 8 个字符',

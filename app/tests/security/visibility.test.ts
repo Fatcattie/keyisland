@@ -27,8 +27,15 @@ class MemoryItemStore implements ItemStorePort {
     return JSON.parse(JSON.stringify(this.records)) as EncryptedItemRecord[];
   }
 
-  async saveItems(records: EncryptedItemRecord[]): Promise<void> {
-    this.records = JSON.parse(JSON.stringify(records)) as EncryptedItemRecord[];
+  async applyItemChanges(changes: { upserts: EncryptedItemRecord[]; deletes: number[] }): Promise<void> {
+    const byId = new Map(this.records.map((record) => [record.id, record]));
+    for (const id of changes.deletes) {
+      byId.delete(id);
+    }
+    for (const record of JSON.parse(JSON.stringify(changes.upserts)) as EncryptedItemRecord[]) {
+      byId.set(record.id, record);
+    }
+    this.records = [...byId.values()];
   }
 }
 

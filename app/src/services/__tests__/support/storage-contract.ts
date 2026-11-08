@@ -6,7 +6,7 @@
  * （比如桌面版 loadItems 返回 null、或者不校验密钥槽），而两边测试都绿。
  *
  * 这里把契约写成一份断言，**两个实现跑同一份**：任何一边偏离，
- * 那一边的测试文件就会红。新增实现（如将来的 SQLCipher 版）也照此接一次。
+ * 那一边的测试文件就会红。新增实现也照此接一次。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -15,8 +15,11 @@ import type { KeyslotsBundle } from '../../../core/vault/keyslots';
 import type { EncryptedItemRecord, RecentEntry } from '../../../core/vault/types';
 import type { VaultMeta, VaultStorage } from '../../storage';
 
-/** 与 Rust 侧 `ALLOWED_KEYS` 必须完全一致，改一边就要改另一边。 */
-export const STORAGE_KEYS = ['keyslots', 'items', 'meta', 'recency'] as const;
+/**
+ * 与 Rust 侧 `ALLOWED_KEYS` 必须完全一致，改一边就要改另一边。
+ * 资产不在其中：每张卡片一行（`item:<id>`），只经 `storage_load_items` / `storage_commit`。
+ */
+export const STORAGE_KEYS = ['keyslots', 'meta', 'recency'] as const;
 
 export function makeKeyslots(): KeyslotsBundle {
   // 直接用生产参数常量，避免手抄一份后与真实参数漂移。
@@ -187,6 +190,56 @@ export function runStorageContract(label: string, create: () => VaultStorage | P
       await expect(storage.loadMeta()).resolves.toBeNull();
       await expect(storage.loadItems()).resolves.toEqual([]);
       await expect(storage.loadRecency()).resolves.toEqual([]);
+    });
+
+    it('commit：多段一起写入，未出现的段保持原样', async () => {
+      const storage = await create();
+      await storage.saveRecency(makeRecency());
+      await storage.commit({ keyslots: makeKeyslots(), meta: makeMeta(), items: [makeItem()] });
+      await expect(storage.loadKeyslots()).resolves.toEqual(makeKeyslots());
+      await expect(storage.loadMeta()).resolves.toEqual(makeMeta());
+      await expect(storage.loadItems()).resolves.toEqual([makeItem()]);
+      await expect(storage.loadRecency()).resolves.toEqual(makeRecency());
+    });
+
+    it('commit：任何一段不合法，整批拒绝，旧数据一点不动', async () => {
+      const storage = await create();
+      await storage.commit({ keyslots: makeKeyslots(), meta: makeMeta(), items: [makeItem()], recency: [] });
+      const bad = { password: {} } as KeyslotsBundle;
+      await expect(
+        storage.commit({ keyslots: bad, meta: makeMeta({ hint: '新' }), items: [makeItem({ id: 9 })] }),
+      ).rejects.toMatchObject({ code: 'STORAGE_FAILED' });
+      // 重复 id 也属于不合法批次。
+      await expect(
+        storage.commit({ meta: makeMeta({ hint: '新' }), items: [makeItem({ id: 5 }), makeItem({ id: 5 })] }),
+      ).rejects.toMatchObject({ code: 'STORAGE_FAILED' });
+      await expect(storage.loadKeyslots()).resolves.toEqual(makeKeyslots());
+      await expect(storage.loadMeta()).resolves.toEqual(makeMeta());
+      await expect(storage.loadItems()).resolves.toEqual([makeItem()]);
+    });
+
+    it('applyItemChanges：只增删改点名的卡片，其余原样', async () => {
+      const storage = await create();
+      await storage.saveItems([makeItem({ id: 1 }), makeItem({ id: 2 }), makeItem({ id: 3 })]);
+      await storage.applyItemChanges({
+        upserts: [makeItem({ id: 1, title: '改过' }), makeItem({ id: 4, title: '新增' })],
+        deletes: [2],
+      });
+      const loaded = await storage.loadItems();
+      expect(loaded.map((item) => [item.id, item.title]).sort((a, b) => Number(a[0]) - Number(b[0]))).toEqual([
+        [1, '改过'],
+        [3, '契约测试卡片'],
+        [4, '新增'],
+      ]);
+    });
+
+    it('applyItemChanges：同一 id 既写又删视为错误，整批拒绝', async () => {
+      const storage = await create();
+      await storage.saveItems([makeItem({ id: 1 }), makeItem({ id: 2 })]);
+      await expect(
+        storage.applyItemChanges({ upserts: [makeItem({ id: 1, title: 'x' })], deletes: [1, 2] }),
+      ).rejects.toMatchObject({ code: 'STORAGE_FAILED' });
+      await expect(storage.loadItems()).resolves.toHaveLength(2);
     });
 
     it('describeStorage：返回合法形状，不抛错', async () => {

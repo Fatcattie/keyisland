@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { SettingsPanel } from '../SettingsPanel';
 import { MASTER_PASSWORD, createTestClient, renderWithProviders } from '../../__tests__/support/harness';
 
@@ -26,10 +26,18 @@ async function flush(): Promise<void> {
   });
 }
 
-/** 建库并渲染设置面板。 */
+/** 合成卡片：用来证明"没被销毁"，而不是只看列表长度 >= 0。 */
+const SYNTHETIC_TITLE = '销毁保护用的合成卡';
+
+/** 建库、放一张合成卡并渲染设置面板。 */
 async function setup(): Promise<ReturnType<typeof createTestClient>> {
   const harness = createTestClient('boot');
   await harness.client.initialize({ masterPassword: MASTER_PASSWORD });
+  await harness.client.createItem({
+    title: SYNTHETIC_TITLE,
+    username: 'synthetic@example.com',
+    password: 'Synthetic-1-Aa!',
+  });
   renderWithProviders(
     harness.client,
     <SettingsPanel
@@ -95,14 +103,17 @@ describe('设置面板 · 主动销毁', () => {
     expect(confirmButton().disabled).toBe(false);
 
     fireEvent.click(confirmButton());
-    await flush();
 
+    // 主密码校验要跑 KDF，耗时随机器负载浮动：等真实结果，而不是一次 setTimeout(0)。
+    expect(await screen.findByText('主密码不正确')).toBeDefined();
     // 数据必须还在：错的密码不能成为销毁理由。
-    expect(screen.getByText('主密码不正确')).toBeDefined();
     expect((await harness.client.status()).status).toBe('unlocked');
-    expect((await harness.client.listItems()).length).toBeGreaterThanOrEqual(0);
+    const items = await harness.client.listItems();
+    expect(items.map((item) => item.title)).toEqual([SYNTHETIC_TITLE]);
     // 密码输入被清空——留着会让下次点确认像"已经填好了"。
-    expect((screen.getByLabelText('销毁数据主密码') as HTMLInputElement).value).toBe('');
+    await waitFor(() => {
+      expect((screen.getByLabelText('销毁数据主密码') as HTMLInputElement).value).toBe('');
+    });
   });
 
   it('锁定态拒绝销毁，并提示先解锁', async () => {
@@ -112,28 +123,23 @@ describe('设置面板 · 主动销毁', () => {
 
     await fillDestroyForm(MASTER_PASSWORD, '销毁');
     fireEvent.click(confirmButton());
-    await flush();
 
-    expect(screen.getByText('保险库已锁定，请先解锁')).toBeDefined();
-    // 库没有被抹掉：重新解锁后数据照旧。
+    expect(await screen.findByText('保险库已锁定，请先解锁')).toBeDefined();
+    // 库没有被抹掉：重新解锁后合成卡照旧。
+    expect((await harness.client.status()).status).toBe('locked');
     await harness.client.unlock(MASTER_PASSWORD);
-    expect((await harness.client.listItems()).length).toBeGreaterThanOrEqual(0);
+    const items = await harness.client.listItems();
+    expect(items.map((item) => item.title)).toEqual([SYNTHETIC_TITLE]);
   });
 
   it('销毁后回到首次设置状态，且可以重新初始化（E2E-09）', async () => {
     const harness = await setup();
-    await harness.client.createItem({
-      title: '销毁前的一张卡',
-      username: 'user@example.com',
-      password: 'pw-123456',
-    });
-    await flush();
+    expect(await harness.client.listItems()).toHaveLength(1);
 
     await fillDestroyForm(MASTER_PASSWORD, '销毁');
     fireEvent.click(confirmButton());
-    await flush();
 
-    expect(screen.getByText('本地数据已清空')).toBeDefined();
+    expect(await screen.findByText('本地数据已清空')).toBeDefined();
     expect((await harness.client.status()).status).toBe('uninitialized');
 
     // 回到首次设置引导后可以重新开始用。
